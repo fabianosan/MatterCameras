@@ -2,7 +2,7 @@ import { CameraAvStreamManagementServer as BaseCameraAvStreamManagementServer } 
 import { CameraAvStreamManagement } from '@matter/types/clusters/camera-av-stream-management';
 import { StreamUsage } from '@matter/types';
 import { Logger } from '@matter/general';
-import { normalizeJpeg } from '../../streaming/normalizeJpeg.js';
+import { normalizeJpeg, readJpegDimensions } from '../../streaming/normalizeJpeg.js';
 import { streamContext } from './streamContext.js';
 import {
     createDefaultAudioStream,
@@ -15,18 +15,13 @@ const logger = Logger.get('CameraAvStream');
 
 /** Matter TCP max frame is 64KB; snapshot payload must stay well below that. */
 const MAX_SNAPSHOT_BYTES = 48_000;
-const DEFAULT_SNAPSHOT_WIDTH = 640;
-const DEFAULT_SNAPSHOT_HEIGHT = 360;
+const MAX_SNAPSHOT_WIDTH = 640;
+const MIN_SNAPSHOT_WIDTH = 320;
 
-function clampSnapshotResolution(width?: number, height?: number) {
-    let w = width ?? DEFAULT_SNAPSHOT_WIDTH;
-    let h = height ?? DEFAULT_SNAPSHOT_HEIGHT;
-    if (w > DEFAULT_SNAPSHOT_WIDTH || h > DEFAULT_SNAPSHOT_HEIGHT) {
-        const scale = Math.min(DEFAULT_SNAPSHOT_WIDTH / w, DEFAULT_SNAPSHOT_HEIGHT / h);
-        w = Math.max(320, Math.round(w * scale));
-        h = Math.max(240, Math.round(h * scale));
-    }
-    return { width: w, height: h };
+/** Hub may request WxH; only width is used — go2rtc scales with scale=W:-1. */
+function clampSnapshotWidth(requestedWidth?: number): number {
+    const w = requestedWidth ?? MAX_SNAPSHOT_WIDTH;
+    return Math.min(MAX_SNAPSHOT_WIDTH, Math.max(MIN_SNAPSHOT_WIDTH, w));
 }
 const CameraAvServer = BaseCameraAvStreamManagementServer.with(
     'Video', 'Audio', 'Snapshot', 'Speaker', 'ImageControl',
@@ -45,17 +40,23 @@ export class MatterCameraAvStreamManagementServer extends CameraAvServer {
     }
 
     override async audioStreamAllocate(request: CameraAvStreamManagement.AudioStreamAllocateRequest) {
-        const streams = this.state.allocatedAudioStreams ?? [];
-        if (streams.length > 0) {
-            return new AvMgmt.AudioStreamAllocateResponse({ audioStreamId: streams[0].audioStreamId });
+        const usage = request.streamUsage ?? StreamUsage.LiveView;
+        const streams = [...(this.state.allocatedAudioStreams ?? [])];
+        const existing = streams.find(s => s.streamUsage === usage);
+        if (existing) {
+            return new AvMgmt.AudioStreamAllocateResponse({ audioStreamId: existing.audioStreamId });
         }
 
-        const stream = createDefaultAudioStream(request.streamUsage ?? StreamUsage.LiveView);
+        const stream = createDefaultAudioStream(usage);
+        if (usage === StreamUsage.Recording) {
+            stream.audioStreamId = 2;
+        }
         stream.audioCodec = request.audioCodec ?? stream.audioCodec;
         stream.channelCount = request.channelCount ?? stream.channelCount;
         stream.sampleRate = request.sampleRate ?? stream.sampleRate;
         stream.bitRate = request.bitRate ?? stream.bitRate;
-        this.state.allocatedAudioStreams = [stream];
+        streams.push(stream);
+        this.state.allocatedAudioStreams = streams;
 
         return new AvMgmt.AudioStreamAllocateResponse({ audioStreamId: stream.audioStreamId });
     }
@@ -67,13 +68,28 @@ export class MatterCameraAvStreamManagementServer extends CameraAvServer {
     }
 
     override async videoStreamAllocate(request: CameraAvStreamManagement.VideoStreamAllocateRequest) {
-        const streams = this.state.allocatedVideoStreams ?? [];
-        if (streams.length > 0) {
-            return new AvMgmt.VideoStreamAllocateResponse({ videoStreamId: streams[0].videoStreamId });
+        const usage = request.streamUsage ?? StreamUsage.LiveView;
+        const cameraId = String(this.endpoint.id);
+        const streams = [...(this.state.allocatedVideoStreams ?? [])];
+
+        const existing = streams.find(s => s.streamUsage === usage);
+        if (existing) {
+            return new AvMgmt.VideoStreamAllocateResponse({ videoStreamId: existing.videoStreamId });
         }
 
-        const stream = createDefaultVideoStream(request.streamUsage ?? StreamUsage.LiveView);
-        this.state.allocatedVideoStreams = [stream];
+        const stream = createDefaultVideoStream(usage);
+        if (usage === StreamUsage.Recording) {
+            stream.videoStreamId = 2;
+            logger.info(
+                `VideoStreamAllocate Recording camera=${cameraId} streamId=2 `
+                + '(Push AV Stream Transport not implemented — cloud recording will not upload clips)',
+            );
+        } else {
+            stream.videoStreamId = 1;
+        }
+
+        streams.push(stream);
+        this.state.allocatedVideoStreams = streams;
         return new AvMgmt.VideoStreamAllocateResponse({ videoStreamId: stream.videoStreamId });
     }
 
@@ -110,21 +126,17 @@ export class MatterCameraAvStreamManagementServer extends CameraAvServer {
         if (!go2rtc) throw new Error('go2rtc client not initialized');
 
         const cameraId = String(this.endpoint.id);
-        let { width, height } = clampSnapshotResolution(
-            request.requestedResolution?.width,
-            request.requestedResolution?.height,
-        );
+        let maxWidth = clampSnapshotWidth(request.requestedResolution?.width);
 
-        logger.info(`CaptureSnapshot camera=${cameraId} ${width}x${height}`);
+        logger.info(`CaptureSnapshot camera=${cameraId} maxWidth=${maxWidth} (aspect preserved)`);
 
         let jpeg: Uint8Array;
         try {
-            jpeg = await go2rtc.captureFrame(cameraId, width, height);
-            while (jpeg.byteLength > MAX_SNAPSHOT_BYTES && width > 320 && height > 240) {
-                width = Math.round(width * 0.75);
-                height = Math.round(height * 0.75);
-                logger.info(`CaptureSnapshot retry smaller ${width}x${height} (was ${jpeg.byteLength} bytes)`);
-                jpeg = await go2rtc.captureFrame(cameraId, width, height);
+            jpeg = await go2rtc.captureFrame(cameraId, maxWidth);
+            while (jpeg.byteLength > MAX_SNAPSHOT_BYTES && maxWidth > MIN_SNAPSHOT_WIDTH) {
+                maxWidth = Math.max(MIN_SNAPSHOT_WIDTH, Math.round(maxWidth * 0.75));
+                logger.info(`CaptureSnapshot retry maxWidth=${maxWidth} (was ${jpeg.byteLength} bytes)`);
+                jpeg = await go2rtc.captureFrame(cameraId, maxWidth);
             }
         } catch (error) {
             logger.error(`CaptureSnapshot failed camera=${cameraId}: ${error}`);
@@ -132,13 +144,17 @@ export class MatterCameraAvStreamManagementServer extends CameraAvServer {
         }
 
         jpeg = normalizeJpeg(jpeg);
+        const dimensions = readJpegDimensions(jpeg) ?? { width: maxWidth, height: Math.round(maxWidth * 9 / 16) };
 
-        logger.info(`CaptureSnapshot done camera=${cameraId} ${jpeg.byteLength} bytes`);
+        logger.info(
+            `CaptureSnapshot done camera=${cameraId} ${dimensions.width}x${dimensions.height} `
+            + `${jpeg.byteLength} bytes`,
+        );
 
         return new AvMgmt.CaptureSnapshotResponse({
             data: jpeg,
             imageCodec: AvMgmt.ImageCodec.Jpeg,
-            resolution: { width, height },
+            resolution: dimensions,
         });
     }
 }

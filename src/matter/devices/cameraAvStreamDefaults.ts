@@ -16,8 +16,8 @@ export function cameraAvStreamDefaults(): Partial<CameraAvStreamManagement.Attri
     return {
         maxContentBufferSize: 1_000_000,
         maxNetworkBandwidth: 4_000_000,
-        supportedStreamUsages: [StreamUsage.LiveView],
-        streamUsagePriorities: [StreamUsage.LiveView],
+        supportedStreamUsages: [StreamUsage.LiveView, StreamUsage.Recording],
+        streamUsagePriorities: [StreamUsage.LiveView, StreamUsage.Recording],
         maxConcurrentEncoders: 1,
         maxEncodedPixelRate: 2_073_600,
         videoSensorParams: {

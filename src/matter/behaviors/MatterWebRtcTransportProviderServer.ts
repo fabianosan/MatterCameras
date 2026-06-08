@@ -26,6 +26,18 @@ import { buildSolicitOfferResponse } from './solicitOfferHandler.js';
 
 const logger = Logger.get('MatterWebRtc');
 
+/** Hub may return NotFound if WebRtcTransportRequestor is not ready yet (e.g. after TCP session resume). */
+const ANSWER_DELIVERY_RETRY_MS = [0, 200, 500, 1000, 2000];
+
+function isHubSessionNotReady(error: unknown): boolean {
+    const msg = String(error);
+    return msg.includes('NotFound') || msg.includes('code 139');
+}
+
+function sleep(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+
 interface WebRtcSessionState {
     answerSdp: string;
     cameraId: string;
@@ -300,27 +312,41 @@ export class MatterWebRtcTransportProviderServer extends CameraRequirements.WebR
         }
 
         let lastError: unknown;
-        for (const endpoint of this.#hubEndpoints(hubEndpointId)) {
-            const invoke = Invoke(
-                Invoke.ConcreteCommandRequest({
-                    endpoint,
-                    cluster: WebRtcTransportRequestor,
-                    command: 'answer',
-                    fields: new WebRtcTransportRequestor.AnswerRequest({
-                        webRtcSessionId: sessionId,
-                        sdp: answerSdp,
-                    }),
-                }),
-            );
-            invoke.largeMessage = true;
+        for (let attempt = 0; attempt < ANSWER_DELIVERY_RETRY_MS.length; attempt++) {
+            const delay = ANSWER_DELIVERY_RETRY_MS[attempt];
+            if (delay > 0) {
+                await sleep(delay);
+                logger.info(`Retry WebRTC answer delivery session=${sessionId} attempt=${attempt + 1}`);
+            }
 
-            try {
-                await this.#runInvoke(peer, invoke);
-                logger.info(`WebRTC answer delivered session=${sessionId} hubEp=${endpoint}`);
-                return;
-            } catch (error) {
-                lastError = error;
-                logger.warn(`WebRTC answer delivery failed hubEp=${endpoint}: ${error}`);
+            for (const endpoint of this.#hubEndpoints(hubEndpointId)) {
+                const invoke = Invoke(
+                    Invoke.ConcreteCommandRequest({
+                        endpoint,
+                        cluster: WebRtcTransportRequestor,
+                        command: 'answer',
+                        fields: new WebRtcTransportRequestor.AnswerRequest({
+                            webRtcSessionId: sessionId,
+                            sdp: answerSdp,
+                        }),
+                    }),
+                );
+                invoke.largeMessage = true;
+
+                try {
+                    await this.#runInvoke(peer, invoke);
+                    logger.info(
+                        `WebRTC answer delivered session=${sessionId} hubEp=${endpoint} `
+                        + `attempt=${attempt + 1}`,
+                    );
+                    return;
+                } catch (error) {
+                    lastError = error;
+                    if (isHubSessionNotReady(error) && attempt < ANSWER_DELIVERY_RETRY_MS.length - 1) {
+                        break;
+                    }
+                    logger.warn(`WebRTC answer delivery failed hubEp=${endpoint}: ${error}`);
+                }
             }
         }
 

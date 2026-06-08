@@ -29,6 +29,11 @@ async function main() {
     // Start Matter only after cameras are on the aggregator (avoids hub seeing empty partsList).
     await bridge.start();
 
+    for (const cam of cameras) {
+        bridge.motionDetection.startCamera(cam.id, bridge.go2rtc);
+    }
+    console.log(`Motion detection active for ${cameras.length} camera(s)`);
+
     bridge.go2rtc.startPeriodicPrune();
     startWebServer();
 }

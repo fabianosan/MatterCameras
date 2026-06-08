@@ -7,10 +7,29 @@ Bridge: **MatterCameras** on `192.168.1.50` → SmartThings hub via Matter 1.5 C
 | Feature | iOS (SmartThings app) | Android |
 |---------|----------------------|---------|
 | Snapshot | OK | OK |
-| Live view (video) | **OK** (some cameras 2nd attempt) | **FAIL** — app-side DTLS (see below) |
+| Live view (video) | **OK** (some cameras 2nd attempt); **regression possible after hub TCP reconnect** | **FAIL** — app-side DTLS (see below) |
 | Live view (audio) | **OK** (all cameras) | **FAIL** — blocked by DTLS |
 
-**Working stack:** patched go2rtc + Matter app with hub-offer filtering, single bridge candidate, `prepareHubOfferForGo2rtc`, and serialized `ProvideOffer` per camera.
+**Working stack:** patched go2rtc + Matter app with hub-offer filtering, single bridge candidate, `prepareHubOfferForGo2rtc`, serialized `ProvideOffer` per camera, and **retry backoff** on hub `WebRtcTransportRequestor.answer` when hub returns `NotFound (139)`.
+
+### iOS regression — hub TCP session resume (2026-06-08 ~23:24)
+
+After hub **re-interview** (motion clusters / `softwareVersion` bump), the hub opened a new Matter TCP session (`peerSess 6cc3`, was UDP `6cc2`). Live view then failed even though go2rtc answered:
+
+```
+go2rtc WebRTC answer camera=cam-… mode=whep sdp=2198ch relay=0
+WebRTC answer delivery failed hubEp=0: … NotFound (139)
+WebRTC answer delivery failed hubEp=1: … UnsupportedAccess (126)
+Invoke error … provideOffer: Status=UnsupportedAccess(126)
+```
+
+**Not a go2rtc/ICE issue** — the bridge could not deliver the SDP answer to the hub’s `WebRtcTransportRequestor` (session not ready yet on the new TCP path).
+
+**Mitigation:** answer delivery retries (200 ms → 2 s) — helps transient `NotFound`; **may not recover** if hub requestor state is stale after full re-interview (still failing 23:26 UTC on session `c21b`).
+
+**Workarounds:** restart SmartThings hub; retry live view in app; pull-to-refresh camera device.
+
+Earlier the same evening, session `6cc2` delivered answers successfully (`WebRTC answer delivered session=1 hubEp=0`).
 
 ---
 

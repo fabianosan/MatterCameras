@@ -87,7 +87,9 @@ Set `matterHost` to your Mac LAN IP or `0.0.0.0` for local testing. Production t
 - [x] WebRTC signaling via go2rtc (WebSocket + hub TURN)
 - [x] JPEG snapshots via go2rtc
 - [ ] ONVIF auto-discovery
-- [ ] Motion events
+- [x] Motion events (Matter Zone Management + OccupancySensing + RTSP frame-diff)
+- [x] Agent handoff doc (`docs/AGENT-CONTEXT.md`)
+- [ ] Cloud recording (Push AV Stream Transport — see `docs/MATTER-CAMERA.md`)
 
 ## Repository
 

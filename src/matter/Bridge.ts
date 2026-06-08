@@ -7,6 +7,7 @@ import { DeviceTypeId, VendorId } from '@matter/types';
 import { appConfig } from '../config/app.js';
 import { Camera } from '../types/index.js';
 import { Go2RTCClient } from '../streaming/Go2RTCClient.js';
+import { MotionDetectionService } from '../streaming/MotionDetectionService.js';
 import { streamContext } from './behaviors/streamContext.js';
 import { BridgedDeviceBasicInformationServer } from '@matter/main/behaviors/bridged-device-basic-information';
 import { BridgedCameraDevice, bridgedCameraOptions } from './devices/BridgedCameraDevice.js';
@@ -20,6 +21,7 @@ export class MatterBridge {
     private readonly cameraEndpoints = new Map<string, Endpoint>();
     private started = false;
     readonly go2rtc: Go2RTCClient;
+    readonly motionDetection = new MotionDetectionService();
 
     constructor() {
         this.go2rtc = new Go2RTCClient(appConfig.go2rtcUrl);
@@ -104,6 +106,7 @@ export class MatterBridge {
             bridgedCameraOptions(camera),
         );
         this.cameraEndpoints.set(camera.id, endpoint);
+        this.motionDetection.startCamera(camera.id, this.go2rtc);
     }
 
     async getPairingInfo() {
@@ -141,6 +144,7 @@ export class MatterBridge {
             return;
         }
         console.log(`Removing bridged camera: ${id}`);
+        this.motionDetection.stopCamera(id);
         await endpoint.delete();
         this.cameraEndpoints.delete(id);
     }

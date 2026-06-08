@@ -243,14 +243,16 @@ export class Go2RTCClient {
         await this.pruneOrphanStreams();
     }
 
-    /** Fetch a JPEG snapshot from go2rtc (RTSP frame grab). */
-    async captureFrame(streamId: string, width?: number, height?: number): Promise<Uint8Array> {
+    /**
+     * Fetch a JPEG snapshot from go2rtc (RTSP frame grab).
+     * Only maxWidth is passed so ffmpeg uses scale=W:-1 and preserves aspect ratio.
+     */
+    async captureFrame(streamId: string, maxWidth?: number): Promise<Uint8Array> {
         await this.ensureStream(streamId);
 
         const streamName = this.sanitizeName(streamId);
         const params = new URLSearchParams({ src: streamName });
-        if (width) params.set('width', String(width));
-        if (height) params.set('height', String(height));
+        if (maxWidth) params.set('width', String(maxWidth));
 
         const response = await fetch(`${this.baseUrl}/api/frame.jpeg?${params}`);
         if (response.status === 404) {

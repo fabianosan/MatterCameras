@@ -36,6 +36,9 @@ rsync -rlvz --omit-dir-times --no-perms --no-owner --no-group \
   --exclude '._*' \
   "${ROOT}/views/" "${USER_NAME}@${HOST}:${DEST}/views/"
 
-ssh "${USER_NAME}@${HOST}" "cd ${DEST} && docker compose restart app && sleep 2 && docker compose ps app"
+rsync -rlvz --omit-dir-times --no-perms --no-owner --no-group \
+  "${ROOT}/docker-compose.yml" "${USER_NAME}@${HOST}:${DEST}/docker-compose.yml"
+
+ssh "${USER_NAME}@${HOST}" "cd ${DEST} && docker compose up -d app && sleep 3 && docker compose ps app"
 
 echo "==> Quick deploy complete."

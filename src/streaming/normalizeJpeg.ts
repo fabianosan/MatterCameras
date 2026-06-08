@@ -43,3 +43,42 @@ export function normalizeJpeg(jpeg: Uint8Array): Uint8Array {
     out.set(body, 2 + JFIF_APP0.length);
     return out;
 }
+
+/** Read encoded dimensions from the first SOF marker in a baseline JPEG. */
+export function readJpegDimensions(jpeg: Uint8Array): { width: number; height: number } | undefined {
+    if (jpeg.length < 10 || jpeg[0] !== 0xff || jpeg[1] !== 0xd8) {
+        return undefined;
+    }
+
+    let offset = 2;
+    while (offset + 9 < jpeg.length) {
+        if (jpeg[offset] !== 0xff) {
+            return undefined;
+        }
+
+        const marker = jpeg[offset + 1];
+        if (marker === 0xd9) {
+            break;
+        }
+
+        const segmentLen = (jpeg[offset + 2] << 8) | jpeg[offset + 3];
+        if (segmentLen < 2 || offset + 2 + segmentLen > jpeg.length) {
+            return undefined;
+        }
+
+        const isSof = marker >= 0xc0 && marker <= 0xcf
+            && marker !== 0xc4 && marker !== 0xc8 && marker !== 0xcc;
+        if (isSof) {
+            const height = (jpeg[offset + 5] << 8) | jpeg[offset + 6];
+            const width = (jpeg[offset + 7] << 8) | jpeg[offset + 8];
+            if (width > 0 && height > 0) {
+                return { width, height };
+            }
+            return undefined;
+        }
+
+        offset += 2 + segmentLen;
+    }
+
+    return undefined;
+}
