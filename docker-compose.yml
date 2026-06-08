@@ -1,6 +1,6 @@
-# MatterCameras — deploy no servidor (host network para mDNS/Matter)
+# MatterCameras — server deploy (host network for mDNS/Matter)
 #
-# Portas usadas no host (verifique conflitos com outras apps):
+# Host ports (check for conflicts with other apps):
 #   3202  — Web UI
 #   3203  — go2rtc API
 #   5550  — Matter (TCP/UDP)

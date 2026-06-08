@@ -36,14 +36,14 @@ Edit `data/config.json`:
 
 Override via env: `MATTER_HOST`, `MATTER_PORT`, `GO2RTC_URL`, etc.
 
-### Docker no servidor (192.168.1.50)
+### Docker on server (192.168.1.50)
 
-Isolado em containers; usa `network_mode: host` só para Matter/mDNS funcionar.
+Runs in containers with `network_mode: host` so Matter/mDNS work correctly.
 
-**Portas no host** (confira se não conflitam com outras apps):
+**Host ports** (check for conflicts with other apps):
 
-| Porta | Serviço |
-|-------|---------|
+| Port | Service |
+|------|---------|
 | 3202 | Web UI |
 | 3203 | go2rtc API |
 | 5550 | Matter |
@@ -52,15 +52,15 @@ Isolado em containers; usa `network_mode: host` só para Matter/mDNS funcionar.
 | 5353 | mDNS (UDP) |
 
 ```bash
-# Deploy do Mac para o servidor
+# Deploy from Mac to server
 npm run deploy
 
-# Ou manualmente no servidor
+# Or manually on the server
 docker compose up --build -d
 docker compose logs -f app
 ```
 
-Dados persistentes em `./data` (câmeras, Matter fabric, go2rtc config).
+Persistent data lives in `./data` (cameras, Matter fabric, go2rtc config).
 
 ## Pairing with SmartThings
 
@@ -75,8 +75,8 @@ Set `matterHost` to your Mac LAN IP or `0.0.0.0` for local testing. Production t
 
 ## Documentation
 
-- **[CHANGELOG.md](CHANGELOG.md)** — histórico de versões, visão geral do sistema e roadmap
-- **[docs/SCALING.md](docs/SCALING.md)** — limites práticos para SmartThings, carga ffmpeg e hardware recomendado por número de câmeras
+- **[CHANGELOG.md](CHANGELOG.md)** — version history, system overview, and roadmap
+- **[docs/SCALING.md](docs/SCALING.md)** — practical SmartThings limits, ffmpeg load, and recommended hardware per camera count
 
 ## Status (MVP)
 

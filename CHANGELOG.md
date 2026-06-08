@@ -1,42 +1,42 @@
 # Changelog
 
-Todas as mudanças relevantes do **MatterCameras** são documentadas neste arquivo.
+All notable changes to **MatterCameras** are documented in this file.
 
-O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e o versionamento segue [Semantic Versioning](https://semver.org/lang/pt-BR/).
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
-Repositório: [github.com/patricktd/MatterCameras](https://github.com/patricktd/MatterCameras)
+Repository: [github.com/patricktd/MatterCameras](https://github.com/patricktd/MatterCameras)
 
 ---
 
-## Visão geral do sistema
+## System overview
 
-O **MatterCameras** é uma bridge que expõe câmeras RTSP/ONVIF como dispositivos **Matter 1.5 Camera** (tipo `0x0142`) em um hub Matter — em especial **SmartThings** (Aeotec Hub v2) e outros controladores compatíveis.
+**MatterCameras** is a bridge that exposes RTSP/ONVIF cameras as **Matter 1.5 Camera** devices (type `0x0142`) on a Matter hub — primarily **SmartThings** (Aeotec Hub v2) and other compatible controllers.
 
-### Fluxo de dados
+### Data flow
 
 ```
-RTSP/ONVIF → go2rtc (WebRTC + snapshots) → Matter Bridge (matter.js 0.17) → Hub Matter
+RTSP/ONVIF → go2rtc (WebRTC + snapshots) → Matter Bridge (matter.js 0.17) → Matter Hub
 ```
 
-### Componentes
+### Components
 
-| Componente | Caminho / serviço | Responsabilidade |
-|------------|-------------------|------------------|
-| **App Node.js** | `src/main.ts` | Orquestra storage, bridge Matter, go2rtc e Web UI |
-| **Matter Bridge** | `src/matter/Bridge.ts` | Aggregator Matter (`0x0e`); adiciona endpoints de câmera bridged |
-| **Câmera bridged** | `src/matter/devices/BridgedCameraDevice.ts` | Device type Camera `0x0142` com clusters AV + WebRTC |
-| **AV Stream Management** | `src/matter/behaviors/MatterCameraAvStreamManagementServer.ts` | Live view H.264, snapshots JPEG, áudio stub |
-| **WebRTC Provider** | `src/matter/behaviors/MatterWebRtcTransportProviderServer.ts` | Sinalização Matter ↔ go2rtc (`ProvideOffer`, ICE trickle) |
-| **go2rtc client** | `src/streaming/Go2RTCClient.ts` | Registro de streams, transcode ffmpeg, WebRTC e frames |
-| **Storage** | `src/storage/db.ts` | Persistência de câmeras em `data/cameras.json` (lowdb) |
-| **Web UI** | `src/web/server.ts` + `views/` | Dashboard Express/EJS para gestão e pairing |
-| **go2rtc** | container `alexxit/go2rtc` | Ingestão RTSP, relay WebRTC, API HTTP/WS |
-| **Deploy** | `docker-compose.yml`, `scripts/deploy.sh` | Produção em `network_mode: host` (mDNS/Matter) |
+| Component | Path / service | Responsibility |
+|-----------|----------------|----------------|
+| **Node.js app** | `src/main.ts` | Orchestrates storage, Matter bridge, go2rtc, and Web UI |
+| **Matter Bridge** | `src/matter/Bridge.ts` | Matter Aggregator (`0x0e`); adds bridged camera endpoints |
+| **Bridged camera** | `src/matter/devices/BridgedCameraDevice.ts` | Camera device type `0x0142` with AV + WebRTC clusters |
+| **AV Stream Management** | `src/matter/behaviors/MatterCameraAvStreamManagementServer.ts` | H.264 live view, JPEG snapshots, audio stub |
+| **WebRTC Provider** | `src/matter/behaviors/MatterWebRtcTransportProviderServer.ts` | Matter ↔ go2rtc signaling (`ProvideOffer`, ICE trickle) |
+| **go2rtc client** | `src/streaming/Go2RTCClient.ts` | Stream registration, ffmpeg transcode, WebRTC, frames |
+| **Storage** | `src/storage/db.ts` | Camera persistence in `data/cameras.json` (lowdb) |
+| **Web UI** | `src/web/server.ts` + `views/` | Express/EJS dashboard for management and pairing |
+| **go2rtc** | `alexxit/go2rtc` container | RTSP ingest, WebRTC relay, HTTP/WS API |
+| **Deploy** | `docker-compose.yml`, `scripts/deploy.sh` | Production with `network_mode: host` (mDNS/Matter) |
 
-### Portas padrão (produção)
+### Default ports (production)
 
-| Porta | Serviço |
-|-------|---------|
+| Port | Service |
+|------|---------|
 | 3202 | Web UI |
 | 3203 | go2rtc API |
 | 5550 | Matter (TCP/UDP) |
@@ -44,110 +44,118 @@ RTSP/ONVIF → go2rtc (WebRTC + snapshots) → Matter Bridge (matter.js 0.17) �
 | 8555 | WebRTC (TCP/UDP) |
 | 5353 | mDNS (UDP) |
 
-### Configuração
+### Configuration
 
-- Arquivo: `data/config.json`
-- Variáveis de ambiente: `MATTER_HOST`, `MATTER_PORT`, `WEB_PORT`, `GO2RTC_URL`, `MATTER_PASSCODE`, etc.
-- Dados persistentes: `data/` (câmeras, fabric Matter, `go2rtc.yaml`)
+- File: `data/config.json`
+- Environment variables: `MATTER_HOST`, `MATTER_PORT`, `WEB_PORT`, `GO2RTC_URL`, `MATTER_PASSCODE`, etc.
+- Persistent data: `data/` (cameras, Matter fabric, `go2rtc.yaml`)
 
-### Limites operacionais
+### Operational limits
 
-Consulte [docs/SCALING.md](docs/SCALING.md) para recomendações de hardware, número de câmeras e gargalos (ffmpeg, TURN do hub, ~50 dispositivos bridged no SmartThings).
+See [docs/SCALING.md](docs/SCALING.md) for hardware recommendations, camera counts, and bottlenecks (ffmpeg, hub TURN, ~50 bridged devices on SmartThings).
 
 ---
 
 ## [Unreleased]
 
-### Planejado
+### Added
 
-- Descoberta automática ONVIF
-- Eventos de movimento via Matter
-- Aviso na Web UI ao ultrapassar 4+ câmeras
-- Testes automatizados
+- Cursor agent rule (`.cursor/rules/documentation.mdc`) requiring changelog updates for major changes and English-only documentation
+
+### Changed
+
+- All project documentation translated to English (`CHANGELOG.md`, `docs/SCALING.md`, `README.md`, deploy comments)
+
+### Planned
+
+- ONVIF auto-discovery
+- Motion events via Matter
+- Web UI warning when adding more than 4 cameras
+- Automated tests
 
 ---
 
 ## [1.0.0] — 2026-06-08
 
-Primeira release funcional sincronizada com GitHub, com streaming estável, gestão de câmeras na UI e documentação de escala.
+First functional release synced to GitHub, with stable streaming, camera management in the UI, and scaling documentation.
 
-### Adicionado
+### Added
 
-- **Edição de câmeras** na Web UI (nome, URL RTSP, codec) sem remover/recriar o endpoint
-- **API REST** `POST /api/cameras/:id` para atualizar câmeras existentes
-- **Painel de logs** em tempo real na dashboard (`GET /api/logs`, polling a cada 2 s)
-- **Remoção dinâmica** de câmeras no bridge Matter (`endpoint.delete()`)
-- **Atualização de metadados** no bridge ao editar nome (`BridgedDeviceBasicInformation`)
-- **Pre-warm WebRTC** no boot — inicia transcode ffmpeg antes do hub abrir live view (evita cold start > 5 s)
-- **Prune periódico** de streams órfãos no go2rtc (intervalo padrão: 5 min)
-- **`syncAllStreams()`** — re-registra todas as câmeras e remove entradas stale no go2rtc
-- **Locks por câmera** no `Go2RTCClient` para serializar operações ffmpeg pesadas
-- **WebRTC via WebSocket** quando o hub envia ICE servers TURN/STUN (SmartThings)
-- **ICE trickle** — candidatos Matter mapeados para SDP e vice-versa (`webrtcIce.ts`)
-- **Snapshots JPEG** via cluster Camera AV Stream Management (limite 48 KB, resolução máx. 640×360)
-- **Documentação de escala** em `docs/SCALING.md`
+- **Camera editing** in the Web UI (name, RTSP URL, codec) without removing/recreating the endpoint
+- **REST API** `POST /api/cameras/:id` to update existing cameras
+- **Live log panel** on the dashboard (`GET /api/logs`, 2 s polling)
+- **Dynamic removal** of cameras on the Matter bridge (`endpoint.delete()`)
+- **Metadata updates** on the bridge when editing the camera name (`BridgedDeviceBasicInformation`)
+- **WebRTC pre-warm** on boot — starts ffmpeg transcode before the hub opens live view (avoids cold start > 5 s)
+- **Periodic prune** of orphan go2rtc streams (default interval: 5 min)
+- **`syncAllStreams()`** — re-registers all cameras and removes stale go2rtc entries
+- **Per-camera locks** in `Go2RTCClient` to serialize heavy ffmpeg operations
+- **WebRTC over WebSocket** when the hub sends TURN/STUN ICE servers (SmartThings)
+- **ICE trickle** — Matter candidates mapped to SDP and back (`webrtcIce.ts`)
+- **JPEG snapshots** via Camera AV Stream Management cluster (48 KB limit, max resolution 640×360)
+- **Scaling documentation** in `docs/SCALING.md`
 
-### Alterado
+### Changed
 
-- `Go2RTCClient` reescrito: health check, retry em 404, normalização de ICE, exchange WS + HTTP
-- Ordem de inicialização: câmeras registradas **antes** de `bridge.start()` (hub não vê `partsList` vazio)
-- `docker-compose.yml`: healthcheck no go2rtc com `depends_on: service_healthy`
-- Web UI: layout de cards, ações inline (editar/cancelar), estilos no header
+- `Go2RTCClient` rewritten: health check, 404 retry, ICE normalization, WS + HTTP exchange
+- Startup order: cameras registered **before** `bridge.start()` (hub does not see an empty `partsList`)
+- `docker-compose.yml`: go2rtc healthcheck with `depends_on: service_healthy`
+- Web UI: card layout, inline actions (edit/cancel), header styles
 
-### Corrigido
+### Fixed
 
-- Streams go2rtc remanescentes após exclusão de câmera
-- Falha de live view quando ffmpeg ainda não tinha subido o stream `_webrtc`
-- Hub SmartThings ignorando `ice_servers` em requisições HTTP JSON (uso de API WebSocket do go2rtc)
+- Orphan go2rtc streams after camera deletion
+- Live view failure when ffmpeg had not yet brought up the `_webrtc` stream
+- SmartThings hub ignoring `ice_servers` on HTTP JSON requests (go2rtc WebSocket API used instead)
 
 ---
 
 ## [0.2.0] — 2026-06-08
 
-Melhorias iniciais no cliente go2rtc e resiliência de conexão.
+Initial go2rtc client improvements and connection resilience.
 
-### Adicionado
+### Added
 
-- `waitUntilReady()` — aguarda API go2rtc após restart do container (até 60 tentativas)
-- `ensureStream()` — re-registra stream RTSP + `_webrtc` se ausente
-- `captureFrame()` — captura JPEG para snapshots Matter
-- Retry automático em `exchangeWebRtcOffer` quando go2rtc retorna 404
-- Dois streams por câmera: RTSP direto + `{id}_webrtc` com transcode H.264 via ffmpeg
+- `waitUntilReady()` — waits for go2rtc API after container restart (up to 60 attempts)
+- `ensureStream()` — re-registers RTSP + `_webrtc` stream if missing
+- `captureFrame()` — JPEG capture for Matter snapshots
+- Automatic retry in `exchangeWebRtcOffer` when go2rtc returns 404
+- Two streams per camera: direct RTSP + `{id}_webrtc` with H.264 transcode via ffmpeg
 
-### Alterado
+### Changed
 
-- Logs mais detalhados no fluxo WebRTC (tamanho SDP, modo ws/http, contagem relay)
+- More detailed WebRTC flow logs (SDP size, ws/http mode, relay count)
 
 ---
 
 ## [0.1.0] — 2026-06-08
 
-MVP da bridge Matter Camera com deploy Docker e Web UI básica.
+Matter Camera bridge MVP with Docker deployment and basic Web UI.
 
-### Adicionado
+### Added
 
-- **Matter Bridge** com `matter.js` 0.17 / Matter 1.5
+- **Matter Bridge** with `matter.js` 0.17 / Matter 1.5
   - Aggregator device type `0x0e`
-  - Endpoints bridged Camera `0x0142` por câmera RTSP
-- **Clusters Matter implementados**
+  - Bridged Camera `0x0142` endpoints per RTSP camera
+- **Matter clusters implemented**
   - `BridgedDeviceBasicInformation`
-  - `CameraAvStreamManagement` (vídeo H.264 LiveView, snapshot, áudio stub)
+  - `CameraAvStreamManagement` (H.264 LiveView video, snapshot, audio stub)
   - `WebRtcTransportProvider` (`ProvideOffer`, `ProvideAnswer`, `ProvideIceCandidates`)
-- **Integração go2rtc** — registro PUT `/api/streams`, WebRTC POST `/api/webrtc`
+- **go2rtc integration** — PUT `/api/streams` registration, WebRTC POST `/api/webrtc`
 - **Web UI** (Express + EJS)
-  - Adicionar/remover câmeras
-  - QR code e código manual de pairing Matter
-  - Factory reset do fabric (`POST /api/reset`)
-- **Storage** JSON com lowdb (`data/cameras.json`)
-- **Configuração** via `data/config.json` + env vars (`src/config/app.ts`)
+  - Add/remove cameras
+  - Matter pairing QR code and manual code
+  - Fabric factory reset (`POST /api/reset`)
+- **JSON storage** with lowdb (`data/cameras.json`)
+- **Configuration** via `data/config.json` + env vars (`src/config/app.ts`)
 - **Docker**
-  - `Dockerfile` multi-stage para app Node
-  - `docker-compose.yml` com go2rtc + app em `network_mode: host`
-- **Deploy remoto** — `npm run deploy` (`scripts/deploy.sh`)
-- **Patches Matter** — `tlvPatch.ts`, desabilitação de validação WebRTC estrita (`webrtcCommandValidation.ts`)
-- **README** com arquitetura, quick start e instruções SmartThings
+  - Multi-stage `Dockerfile` for Node app
+  - `docker-compose.yml` with go2rtc + app on `network_mode: host`
+- **Remote deploy** — `npm run deploy` (`scripts/deploy.sh`)
+- **Matter patches** — `tlvPatch.ts`, relaxed WebRTC command validation (`webrtcCommandValidation.ts`)
+- **README** with architecture, quick start, and SmartThings instructions
 
-### Dependências principais
+### Dependencies
 
 - `@matter/main`, `@project-chip/matter.js` ^0.17.1
 - `express` ^4.21, `ejs` ^3.1, `lowdb` ^7.0
@@ -157,32 +165,32 @@ MVP da bridge Matter Camera com deploy Docker e Web UI básica.
 
 ## [0.0.1] — 2026-06-05
 
-### Adicionado
+### Added
 
-- Repositório GitHub inicial com README stub ("Export Cameras to Matter")
-- Histórico fundido com o projeto local em 2026-06-08 (merge `origin/main`)
-
----
-
-## Legenda de tipos de mudança
-
-| Tipo | Significado |
-|------|-------------|
-| **Adicionado** | Funcionalidade nova |
-| **Alterado** | Mudança em comportamento existente |
-| **Depreciado** | Será removido em versão futura |
-| **Removido** | Funcionalidade removida |
-| **Corrigido** | Correção de bug |
-| **Segurança** | Correção de vulnerabilidade |
+- Initial GitHub repository with README stub ("Export Cameras to Matter")
+- History merged with local project on 2026-06-08 (merge `origin/main`)
 
 ---
 
-## Como atualizar este changelog
+## Change types
 
-1. Agrupe mudanças em **[Unreleased]** durante o desenvolvimento.
-2. Ao publicar, mova o conteúdo para uma nova seção `[X.Y.Z] — AAAA-MM-DD`.
-3. Atualize `version` em `package.json` para manter consistência.
-4. Commits relevantes: use mensagens que facilitem a entrada no changelog (ex.: `feat:`, `fix:`, `docs:`).
+| Type | Meaning |
+|------|---------|
+| **Added** | New feature |
+| **Changed** | Change in existing behavior |
+| **Deprecated** | Will be removed in a future version |
+| **Removed** | Removed feature |
+| **Fixed** | Bug fix |
+| **Security** | Vulnerability fix |
+
+---
+
+## How to update this changelog
+
+1. Group changes under **[Unreleased]** during development.
+2. On release, move content to a new `[X.Y.Z] — YYYY-MM-DD` section.
+3. Update `version` in `package.json` to stay in sync.
+4. Use commit messages that map cleanly to changelog entries (e.g. `feat:`, `fix:`, `docs:`).
 
 [Unreleased]: https://github.com/patricktd/MatterCameras/compare/v1.0.0...HEAD
 [1.0.0]: https://github.com/patricktd/MatterCameras/compare/v0.2.0...v1.0.0

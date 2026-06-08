@@ -33,4 +33,4 @@ echo "go2rtc:  http://${HOST}:3203"
 echo "Matter:  ${HOST}:5550"
 EOF
 
-echo "==> Deploy concluído."
+echo "==> Deploy complete."
