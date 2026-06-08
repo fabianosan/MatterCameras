@@ -8,10 +8,12 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 
 echo "==> Deploy MatterCameras → ${USER}@${HOST}:${DEST}"
 
-rsync -avz --delete \
+rsync -rlvz --delete --omit-dir-times --no-perms --no-owner --no-group \
   --exclude node_modules \
   --exclude dist \
   --exclude .git \
+  --exclude '.DS_Store' \
+  --exclude '._*' \
   --exclude data/matter-storage \
   --exclude data/cameras.json \
   --exclude '*.expect' \

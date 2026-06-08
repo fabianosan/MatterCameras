@@ -1,126 +1,279 @@
 # WebRTC live view debugging (SmartThings / Matter)
 
-This document tracks ICE/WebRTC issues when bridging RTSP cameras to SmartThings via Matter 1.5, and how the patched go2rtc image is built and deployed.
+Bridge: **MatterCameras** on `192.168.1.50` → SmartThings hub via Matter 1.5 Camera (`0x0142`).
+
+## Current status (2026-06-08)
+
+| Feature | iOS (SmartThings app) | Android |
+|---------|----------------------|---------|
+| Snapshot | OK | OK |
+| Live view (video) | **OK** (some cameras 2nd attempt) | **FAIL** — app-side DTLS (see below) |
+| Live view (audio) | **OK** (all cameras) | **FAIL** — blocked by DTLS |
+
+**Working stack:** patched go2rtc + Matter app with hub-offer filtering, single bridge candidate, `prepareHubOfferForGo2rtc`, and serialized `ProvideOffer` per camera.
+
+---
+
+## Verified test log — iOS (2026-06-08)
+
+**Environment:** iPhone on LAN `192.168.40.120`, bridge `192.168.1.50:8555`, hub TURN `turn-useast1.smartthings.com`.
+
+**Deploy baseline:** app rebuild ~21:03 UTC (concurrency fix: recycle + exchange under one lock, no prewarm in `ProvideOffer`).
+
+### Cameras
+
+| ID | Name |
+|----|------|
+| `cam-1780882153855` | Camera A |
+| `cam-1780929114600` | Doorbell |
+| `cam-1780937983108` | Frente Esquerda |
+| `cam-1780952746929` | Patrick |
+
+### Results (operator report + logs)
+
+| Camera | Live view | Audio | Notes |
+|--------|-----------|-------|-------|
+| Doorbell | OK | OK | Sometimes 2nd attempt |
+| Camera A | OK | OK | Sometimes 2nd attempt |
+| Frente Esquerda | OK | OK | Sometimes 2nd attempt |
+| Patrick | OK | OK | First try ~5 s answer delay |
+
+### Log signatures (success)
+
+**App (`matter_cameras`):**
+
+```
+ProvideOffer camera=cam-… session=1 … hubIceServers=1
+Filtered hub offer ICE session=1 32→4 (LAN host only, ice-lite hint for go2rtc)
+go2rtc WebRTC answer camera=cam-… mode=whep sdp=2202ch relay=0
+WebRTC answer delivered session=1 hubEp=0
+ICE candidates delivered session=1 hubEp=0 count=1
+```
+
+**go2rtc (`matter_go2rtc`):**
+
+```
+ICE connection state changed: connected
+Handshake Completed
+nominated: true
+192.168.1.50:8555 <-> 192.168.40.120:<ephemeral>
+```
+
+SDP answer ~**2202 chars** (video + Opus audio). Earlier video-only answers were ~2020 chars.
+
+### First attempt vs second attempt
+
+| Attempt | Typical answer delay | Why |
+|---------|---------------------|-----|
+| 1st (cold ffmpeg) | **~3–5 s** | `ffmpeg:…#video=h264#audio=opus` spins up on first WebRTC consumer |
+| 2nd (warm ffmpeg) | **~20–50 ms** | ffmpeg already running; hub retry succeeds quickly |
+
+SmartThings may show an error on the 1st attempt if the hub UI times out before video keyframes arrive. **Retrying live view usually works.**
+
+Example from logs:
+
+| Camera | 1st `ProvideOffer` | Answer delay | 2nd `ProvideOffer` | Answer delay |
+|--------|-------------------|--------------|-------------------|--------------|
+| Frente Esquerda | 21:05:40 | ~5 s | 21:05:58 | ~20 ms |
+| Camera A | 21:06:34 | ~2 s | 21:07:01 | ~20 ms |
+| Patrick | 21:08:00 | ~5 s | 21:08:19 | ~30 ms |
+
+---
+
+## Android blocker (confirmed 2026-06-08)
+
+**Bridge is not the bottleneck.** On Android (`192.168.40.63`), logs consistently show:
+
+| Stage | Status |
+|-------|--------|
+| Matter signaling | OK — answer + ICE candidates delivered |
+| ICE (warm retry) | Often OK — `nominated: true`, `192.168.40.63` |
+| DTLS | **FAIL** — go2rtc `answer-setup=[passive,passive]` waits for ClientHello; **Android never completes DTLS** |
+| `Handshake Completed` | **Never** observed for `.63` after many builds |
+
+Attempts tried without breaking iOS:
+
+- ice-lite + LAN ICE filter (iOS path)
+- setup flip → dual DTLS client deadlock
+- full hub ICE (12 candidates) → srflx noise + worse overlap
+- prewarm + inline candidates in answer SDP
+
+**Conclusion:** SmartThings **Android** app likely does not complete WebRTC DTLS with Matter bridged cameras. Snapshots work; live view needs Samsung fix or use **iOS** until then.
+
+Report to Samsung SmartThings with: Matter bridge, Camera cluster 0x0142, hub offer ~4210 ch / 12 candidates / `setup=actpass`, bridge answer `setup=passive`, ICE succeeds, DTLS never starts.
+
+---
+
+## Verified test log — Android (2026-06-08, FAIL)
+
+**Environment:** Android phone on LAN **`192.168.40.63`**, bridge `192.168.1.50:8555`.
+
+**Operator report:** live view failed on **all cameras**.
+
+### Results (logs 21:12–21:14 UTC)
+
+| Camera | Live view | Signaling | ICE | DTLS | Notes |
+|--------|-----------|-----------|-----|------|-------|
+| Doorbell | FAIL | OK | connected + nominated | **never** | 1st ~5 s answer; hub retry ~12 s |
+| Camera A | FAIL | OK | connected + nominated | **never** | disconnected ~16 s after connect |
+| Frente Esquerda | FAIL | OK | failed (overlap) | **never** | STUN `error response` on retry |
+| Patrick | (not in log window) | — | — | — | operator says all failed |
+
+### What works on Android (same as iOS)
+
+```
+ProvideOffer … sdp=4210ch hubIceServers=1        # vs iOS ~6970ch
+Filtered hub offer ICE session=1 12→4
+go2rtc WebRTC answer … sdp=2198ch relay=0
+WebRTC answer delivered session=1 hubEp=0
+ICE candidates delivered session=1 count=1 (×2 + end-of-candidates)
+```
+
+Signaling and ICE nomination **succeed**. go2rtc selects `192.168.1.50:8555 ↔ 192.168.40.63:<ephemeral>` with `nominated: true`.
+
+### Root cause: DTLS handshake never completes
+
+| Platform | After ICE `connected` | DTLS |
+|----------|----------------------|------|
+| iOS `.120` | ~600 ms | `Flight 0 → Flight 4` → **`Handshake Completed`** |
+| Android `.63` | stays in `Flight 0: Waiting` | **no `Handshake Completed`** (21:12–21:14) |
+
+go2rtc acts as **DTLS server** (`[handshake:server] Flight 0: Sending/Waiting`). iOS responds with ClientHello quickly; **Android never sends ClientHello** (or it never reaches the bridge).
+
+Symptoms after ICE connect:
+
+```
+sender_interceptor WARNING: failed sending: the DTLS transport has not started yet
+dtls TRACE: [handshake:server] Flight 0: Sending / Waiting   # retries every ~2 s
+```
+
+Hub retries (~12 s) open a **second** PeerConnection while the first is still closing → `Unhandled STUN … class(error response)` → ICE `failed`.
+
+### iOS vs Android differences (same bridge build)
+
+| | iOS | Android |
+|---|-----|---------|
+| Hub LAN IP | `192.168.40.120` | `192.168.40.63` |
+| Hub offer size | ~6962–6974 ch | ~4196–4210 ch |
+| Hub candidates in offer | 32 → 4 filtered | 12 → 4 filtered |
+| `Handshake Completed` after 21:12 | yes (earlier tests) | **none** |
+
+### Fixes deployed (Android DTLS experiment)
+
+1. **Hub offer diagnostics** — each `ProvideOffer` logs `setup`, fingerprint prefix, candidate count.
+2. **Compact-hub path (Android)** — offers &lt;5500 ch **and** ≤16 candidates: full hub ICE to go2rtc (no filter), prewarm, recycle on retry. **Do not flip `setup:actpass`** — caused dual DTLS client deadlock (`handshake:client` with no Android response).
+3. **iOS unchanged** — filtered LAN ICE + ice-lite hint; recycle only on same-session retry.
+4. **Inline bridge candidate** in answer SDP body plus Matter trickle.
+
+Retest Android; success = `Handshake Completed` in go2rtc within ~2 s of ICE `connected`.
+
+### Monitor during Android retest
+
+```bash
+./scripts/watch-webrtc-logs.sh 2m
+```
+
+Success criteria: `Handshake Completed` in go2rtc within ~2 s of `ICE connection state changed: connected`.
+
+---
 
 ## Symptom checklist
 
 | Stage | OK signal | Failure signal |
 |-------|-----------|----------------|
-| Snapshot | JPEG ~20–40 KB in app logs | HTTP 404 / empty body |
-| Signaling | `ProvideOffer` → go2rtc answer in ~6 s | `WebSocket ICE exchange timeout` |
-| ICE pairs | `state: succeeded` on LAN host pair | All pairs `failed` / `InProgress` forever |
-| Nomination | `nominated: true` on one pair | `nominated: false` after ~10 s → `ICE connection state: failed` |
-| Media | DTLS / SRTP logs in go2rtc | DTLS never starts |
+| Snapshot | JPEG ~20–40 KB | HTTP 404 / empty body |
+| Signaling | `ProvideOffer` → answer in &lt;6 s (warm) or &lt;10 s (cold) | No `go2rtc answer` / timeout |
+| ICE | `connected` + `nominated: true` | `failed` / `error response` STUN |
+| Media | `Handshake Completed` | DTLS never starts |
+| Audio | Opus in SDP (~2202 ch); listen works in app | `m=audio` port 9 / no button |
 
-## Root causes found (2025-06)
+---
 
-### 1. pion `MaxBindingRequests` too low (fixed)
+## Fixes applied (chronological)
 
-On LAN, STUN binding responses take ~25 ms. pion defaults to `MaxBindingRequests=7` and bursts pings across all pairs in ~11 ms, marking pairs failed before responses arrive.
+### 1. pion `MaxBindingRequests` too low
 
-**Patch:** `docker/go2rtc/patch-ice.diff` → `s.SetICEMaxBindingRequests(100)` in `pkg/webrtc/api.go`.
+LAN STUN RTT ~25 ms; default limit 7 exhausted in ~11 ms.
 
-### 2. Hub never nominates a pair (in progress)
+**Patch:** `docker/go2rtc/patch-ice.diff` → `SetICEMaxBindingRequests(100)`.
 
-After patch 1, pairs reach `state: succeeded` (e.g. `192.168.1.50:8555 ↔ 192.168.40.120:xxxxx`) but iOS controlling side keeps `nominated: false`. Logs showed **14 local candidates** (TCP ephemeral, srflx, relay) plus TURN `403 Forbidden IP`. DTLS never started.
+### 2. Noisy bridge candidates
 
-**Hypothesis:** SmartThings ICE scorer is confused by noisy non-host candidates; controlling agent does not nominate even when a host pair works.
+14 local candidates (TCP, srflx, relay) confused hub ICE scoring.
 
-**Patch 2 (current test):**
+**Patches:**
+
+- `patch-candidates.diff` — host UDP only on `filters.ips`
+- Matter `filterLocalBridgeCandidates` + `filterSdpToLocalBridgeCandidate` — one RTP candidate to hub
+- `data/go2rtc.yaml` — `ice_servers: []`, `networks: [udp4]`
+
+### 3. Hub never nominates (iOS `.120`, Android `.140` early tests)
+
+Signaling OK, pairs `succeeded`, but `nominated: false` until ICE failed.
+
+**Patch 3 (working):**
 
 | Layer | Change |
 |-------|--------|
-| go2rtc `api.go` | `s.SetLite(true)` — bridge is passive; hub is controlling |
-| go2rtc `candidates.go` | `FilterCandidate`: only **host + UDP** on `filters.ips` |
-| `data/go2rtc.yaml` | `networks: [udp4]` only; drop STUN/TURN on bridge |
-| Matter app | Do not pass hub `ice_servers` into go2rtc WS; filter candidates to host UDP `:8555` before `ProvideIceCandidates` |
+| Matter `prepareHubOfferForGo2rtc` | Strip hub srflx/relay from offer **copy**; add `a=ice-lite` on copy only so go2rtc becomes ICE **controlling** and sends `USE-CANDIDATE` |
+| go2rtc `api.go` | `SetHostAcceptanceMinWait(0)`; defer srflx/relay nomination |
+| Matter app | Do **not** forward hub `ice_servers` into go2rtc |
+
+### 4. Overlapping PeerConnections (regression 21:00–21:01 UTC)
+
+`prewarm` and `exchange` used separate locks → hub retry opened 2nd PC → `Unhandled STUN error response`.
+
+**Fix:** remove prewarm from `ProvideOffer`; recycle + exchange under **one lock**; serialize `ProvideOffer` per camera endpoint (`#offerChain`).
+
+### 5. Audio
+
+Stream was `ffmpeg:…#video=h264` only → hub had no listen button.
+
+**Fix:** `ffmpeg:…#video=h264#audio=opus` in `Go2RTCClient.#toWebRtcSrc`. Verified on iOS all cameras.
+
+---
 
 ## Patched go2rtc build
 
 ```bash
-# Local (verify patches apply)
-cd docker/go2rtc
-docker build -t matter-go2rtc:patched .
-
-# Server (from deploy dir)
-docker compose build --no-cache go2rtc
-docker compose up -d go2rtc
+cd docker/go2rtc && docker build -t matter-go2rtc:patched .
+# Server:
+docker compose build --no-cache go2rtc && docker compose up -d go2rtc
 ```
 
-Patches applied in order:
+Patches: `patch-ice.diff` (MaxBinding + acceptance waits), `patch-candidates.diff` (host UDP only).
 
-1. `patch-ice.diff` — `MaxBindingRequests` + `ice-lite`
-2. `patch-candidates.diff` — host UDP only
-
-## go2rtc.yaml (production template)
+## go2rtc.yaml (production)
 
 ```yaml
 webrtc:
   listen: ":8555"
   candidates:
-    - <MATTER_HOST>:8555
+    - 192.168.1.50:8555
+  ice_servers: []
   filters:
     networks: [udp4]
-    ips: [<MATTER_HOST>]
+    ips: [192.168.1.50]
 ```
-
-Do **not** set `ice_servers` on the bridge; hub TURN/STUN is for the controller only.
 
 ## Deploy procedure
 
-**Never overwrite** `data/cameras.json` or `data/matter-storage/` (see `.cursor/rules/deployment-safety.mdc`).
-
-### go2rtc + yaml + app code changed
+**Never overwrite** `data/cameras.json` or `data/matter-storage/`.
 
 ```bash
-./scripts/deploy.sh
+./scripts/deploy.sh          # full
+npm run build && ./scripts/quick-deploy.sh   # JS only (rebuild image if TS changed!)
 ```
 
-Or targeted rebuild on server:
-
-```bash
-docker compose build --no-cache go2rtc app
-docker compose up -d go2rtc app
-```
-
-`scripts/quick-deploy.sh` only syncs `dist/` and restarts the app container; it does **not** update the Docker image. Rebuild `app` after TypeScript changes.
-
-### Enable verbose ICE logs (already in docker-compose.yml)
-
-```yaml
-environment:
-  - PION_LOG_DEBUG=all
-  - PION_LOG_TRACE=ice,dtls
-```
-
-Watch during an iOS live-view attempt:
-
-```bash
-docker logs -f matter_go2rtc 2>&1 | grep -E 'nominated|ICE connection|DTLS'
-docker logs -f matter_cameras 2>&1 | grep -E 'ProvideOffer|ICE candidates|Filtered'
-```
-
-## What to look for in the next test
-
-1. App log: `Filtered bridge ICE candidates … 14→1` (or similar small count).
-2. App log: `ICE candidates delivered … count=1` (+ end-of-candidates).
-3. go2rtc: answer SDP contains `a=ice-lite`.
-4. go2rtc: only one `typ host` UDP candidate on `:8555`.
-5. go2rtc: `nominated: true` then DTLS handshake.
-
-## If live view still fails
-
-- Capture full go2rtc ICE trace for one session.
-- Check whether hub sends only host candidates or many srflx/relay (Matter `ProvideOffer` SDP).
-- Try disabling Tailscale on iPhone during LAN test (hub had `100.x` candidates in prior logs).
-- Consider WHIP path vs WebSocket path (Matter uses WS via `Go2RTCClient.#exchangeWebRtcViaWebSocket`).
+After TypeScript changes: `docker compose build --no-cache app && docker compose up -d app`.
 
 ## Related files
 
 | File | Role |
 |------|------|
-| `docker/go2rtc/patch-ice.diff` | pion SettingEngine: binding limit + ice-lite |
+| `docker/go2rtc/patch-ice.diff` | MaxBindingRequests + host acceptance waits |
 | `docker/go2rtc/patch-candidates.diff` | Trickle filter: host UDP only |
-| `src/matter/behaviors/MatterWebRtcTransportProviderServer.ts` | Matter signaling, candidate filter |
-| `src/matter/webrtcIce.ts` | SDP parse + `filterLocalBridgeCandidates` |
-| `src/streaming/Go2RTCClient.ts` | WebSocket offer/answer + trickle gather |
+| `src/matter/webrtcIce.ts` | `prepareHubOfferForGo2rtc`, candidate filters |
+| `src/matter/behaviors/MatterWebRtcTransportProviderServer.ts` | Signaling, session queue |
+| `src/streaming/Go2RTCClient.ts` | ffmpeg WebRTC src, lock, recycle |
+| `scripts/watch-webrtc-logs.sh` | Live log tail for tests |

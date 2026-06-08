@@ -1,6 +1,16 @@
+diff --git a/pkg/webrtc/api.go b/pkg/webrtc/api.go
+index a4da479..c8f1a02 100644
 --- a/pkg/webrtc/api.go
 +++ b/pkg/webrtc/api.go
-@@ -45,6 +45,17 @@ func NewServerAPI(network, address string, filters *Filters) (*webrtc.API, error
+@@ -2,6 +2,7 @@ package webrtc
+ 
+ import (
+ 	"net"
++	"time"
+ 
+ 	"github.com/AlexxIT/go2rtc/pkg/core"
+ 	"github.com/AlexxIT/go2rtc/pkg/xnet"
+@@ -45,6 +46,18 @@ func NewServerAPI(network, address string, filters *Filters) (*webrtc.API, error
  	// fix https://github.com/pion/webrtc/pull/2407
  	s.SetDTLSInsecureSkipHelloVerify(true)
  
@@ -10,10 +20,11 @@
 +	// Raise the limit so pairs remain InProgress until a response arrives.
 +	s.SetICEMaxBindingRequests(100)
 +
-+	// Bridge is always reached on a well-known LAN host:port; the hub (iOS) is
-+	// controlling. ice-lite stops go2rtc from running a full ICE agent and
-+	// avoids nomination stalls when many relay/srflx candidates are in play.
-+	s.SetLite(true)
++	// When the bridge becomes ICE controlling (remote offer marked ice-lite),
++	// nominate LAN host pairs immediately instead of waiting on srflx/relay.
++	s.SetHostAcceptanceMinWait(0)
++	s.SetSrflxAcceptanceMinWait(24 * time.Hour)
++	s.SetRelayAcceptanceMinWait(24 * time.Hour)
 +
  	if filters != nil && filters.Loopback {
  		s.SetIncludeLoopbackCandidate(true)

@@ -5,6 +5,8 @@ const logger = Logger.get('Go2RTCClient');
 
 const WS_ICE_GATHER_MS = 6_000;
 const WS_ICE_QUIET_MS = 1_000;
+const WEBRTC_EXCHANGE_TIMEOUT_MS = 15_000;
+const PREWARM_MAX_AGE_MS = 120_000;
 
 export interface Go2RtcIceServer {
     urls: string[];
@@ -30,7 +32,12 @@ export class Go2RTCClient {
     private sources = new Map<string, StreamSource>();
     /** Serialize ffmpeg-heavy ops per camera to avoid starving the other stream. */
     private readonly locks = new Map<string, Promise<void>>();
+    private readonly prewarmAt = new Map<string, number>();
+    /** Tracks recent compact-hub (Android) offers per camera for go2rtc recycle. */
+    private readonly compactHubOfferAt = new Map<string, number>();
     private pruneTimer?: ReturnType<typeof setInterval>;
+
+    private static readonly COMPACT_HUB_RECYCLE_MS = 120_000;
 
     constructor(baseUrl: string = 'http://127.0.0.1:3203') {
         this.baseUrl = baseUrl.replace(/\/$/, '');
@@ -131,10 +138,34 @@ export class Go2RTCClient {
                 }
                 const bytes = (await response.arrayBuffer()).byteLength;
                 logger.info(`WebRTC pre-warm ${webrtcName} ok ${bytes}B in ${Date.now() - started}ms`);
+                this.prewarmAt.set(streamId, Date.now());
             } finally {
                 clearTimeout(timer);
             }
         });
+    }
+
+    /** Warm ffmpeg if the hub has not opened live view recently (avoids first-attempt timeouts). */
+    async prewarmWebRtcIfStale(streamId: string): Promise<void> {
+        const last = this.prewarmAt.get(streamId) ?? 0;
+        if (Date.now() - last < PREWARM_MAX_AGE_MS) {
+            return;
+        }
+        await this.prewarmWebRtc(streamId);
+    }
+
+    /** Drop an active WebRTC consumer/ffmpeg producer before a hub retry on the same camera. */
+    async recycleWebRtcStream(streamId: string): Promise<void> {
+        await this.#withLock(streamId, () => this.#recycleWebRtcStreamUnlocked(streamId));
+    }
+
+    shouldRecycleCompactHub(streamId: string): boolean {
+        const last = this.compactHubOfferAt.get(streamId) ?? 0;
+        return Date.now() - last < Go2RTCClient.COMPACT_HUB_RECYCLE_MS;
+    }
+
+    markCompactHubOffer(streamId: string): void {
+        this.compactHubOfferAt.set(streamId, Date.now());
     }
 
     /** Pre-warm all registered cameras (parallel). */
@@ -178,7 +209,7 @@ export class Go2RTCClient {
 
         const entries: Array<{ name: string; src: string }> = [
             { name: streamName, src: rtspUrl },
-            { name: webrtcName, src: this.#toH264Src(rtspUrl) },
+            { name: webrtcName, src: this.#toWebRtcSrc(rtspUrl) },
         ];
 
         for (const { name, src } of entries) {
@@ -249,8 +280,12 @@ export class Go2RTCClient {
         offerSdp: string,
         iceServers?: Go2RtcIceServer[],
         retried = false,
+        opts?: { recycle?: boolean },
     ): Promise<WebRtcExchangeResult> {
         return this.#withLock(streamId, async () => {
+            if (opts?.recycle) {
+                await this.#recycleWebRtcStreamUnlocked(streamId);
+            }
             await this.ensureStream(streamId);
 
             const streamName = this.webrtcStreamName(streamId);
@@ -269,11 +304,14 @@ export class Go2RTCClient {
                 }
 
                 const url = `${this.baseUrl}/api/webrtc?src=${encodeURIComponent(streamName)}`;
+                const controller = new AbortController();
+                const timer = setTimeout(() => controller.abort(), WEBRTC_EXCHANGE_TIMEOUT_MS);
                 const response = await fetch(url, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/sdp', Accept: 'application/sdp' },
                     body: offerSdp,
-                });
+                    signal: controller.signal,
+                }).finally(() => clearTimeout(timer));
 
                 if (response.status === 404 && !retried) {
                     await this.ensureStream(streamId);
@@ -300,6 +338,9 @@ export class Go2RTCClient {
 
                 return { answerSdp, whepLocation, whepEtag };
             } catch (error) {
+                if (error instanceof Error && error.name === 'AbortError') {
+                    throw new Error(`go2rtc WebRTC timed out camera=${streamId} after ${WEBRTC_EXCHANGE_TIMEOUT_MS}ms`);
+                }
                 if (!retried) {
                     await this.ensureStream(streamId);
                     return this.exchangeWebRtcOffer(streamId, offerSdp, iceServers, true);
@@ -402,12 +443,15 @@ export class Go2RTCClient {
         return name.replace(/[^a-zA-Z0-9_\-]/g, '_');
     }
 
-    /** Matter advertises H.264; transcode H.265/HEVC RTSP sources via ffmpeg. */
-    #toH264Src(rtspUrl: string): string {
+    /**
+     * Matter live view: H.264 video + Opus audio (SmartThings WebRTC offer expects both).
+     * UniFi/RTSP sources are transcoded on demand via ffmpeg in go2rtc.
+     */
+    #toWebRtcSrc(rtspUrl: string): string {
         if (rtspUrl.startsWith('ffmpeg:')) {
             return rtspUrl;
         }
-        return `ffmpeg:${rtspUrl}#video=h264`;
+        return `ffmpeg:${rtspUrl}#video=h264#audio=opus`;
     }
 
     #normalizeIceServers(iceServers: Go2RtcIceServer[]): Go2RtcIceServer[] {
@@ -519,6 +563,25 @@ export class Go2RTCClient {
                 }
             });
         });
+    }
+
+    async #recycleWebRtcStreamUnlocked(streamId: string): Promise<void> {
+        const source = this.sources.get(streamId);
+        if (!source) return;
+
+        const webrtcName = this.webrtcStreamName(streamId);
+        await this.#deleteStreamByName(webrtcName);
+        const params = new URLSearchParams({
+            src: this.#toWebRtcSrc(source.rtspUrl),
+            name: webrtcName,
+        });
+        const response = await fetch(`${this.baseUrl}/api/streams?${params}`, { method: 'PUT' });
+        if (!response.ok && response.status !== 400) {
+            const body = await response.text().catch(() => '');
+            throw new Error(`go2rtc recycle failed (${response.status}): ${body || response.statusText}`);
+        }
+        this.prewarmAt.delete(streamId);
+        logger.info(`Recycled go2rtc WebRTC stream ${webrtcName}`);
     }
 
     async #withLock<T>(streamId: string, fn: () => Promise<T>): Promise<T> {

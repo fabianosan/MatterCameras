@@ -9,8 +9,20 @@ import { StreamUsage, NodeId, EndpointNumber, FabricIndex } from '@matter/types'
 import { StatusCode as Status, StatusResponseError } from '@matter/types/common';
 import { streamContext } from './streamContext.js';
 import { disableWebRtcCommandValidation } from '../webrtcCommandValidation.js';
-import { filterLocalBridgeCandidates, matterIceToSdpFrag, parseSdpIceCandidates } from '../webrtcIce.js';
+import {
+    describeAnswerSetup,
+    describeHubOffer,
+    embedLocalCandidatesInAnswerSdp,
+    filterLocalBridgeCandidates,
+    filterSdpToLocalBridgeCandidate,
+    formatHubOfferDiagnostics,
+    isCompactHubOffer,
+    matterIceToSdpFrag,
+    parseSdpIceCandidates,
+    prepareHubOfferForGo2rtc,
+} from '../webrtcIce.js';
 import { appConfig } from '../../config/app.js';
+import { buildSolicitOfferResponse } from './solicitOfferHandler.js';
 
 const logger = Logger.get('MatterWebRtc');
 
@@ -30,6 +42,7 @@ export class MatterWebRtcTransportProviderServer extends CameraRequirements.WebR
 
     #sessions = new Map<number, WebRtcSessionState>();
     #nextSessionId = 1;
+    #offerChain: Promise<void> = Promise.resolve();
 
     /** WebRTCSessionID is uint16 per Matter spec (max 65535). */
     #allocateSessionId(requested: number | null | undefined): number {
@@ -41,7 +54,19 @@ export class MatterWebRtcTransportProviderServer extends CameraRequirements.WebR
         return id;
     }
 
+    override async solicitOffer(request: WebRtcTransportProvider.SolicitOfferRequest) {
+        const sessionId = this.#allocateSessionId(undefined);
+        return buildSolicitOfferResponse(sessionId, request);
+    }
+
     override async provideOffer(request: WebRtcTransportProvider.ProvideOfferRequest) {
+        const run = () => this.#provideOffer(request);
+        const next = this.#offerChain.then(run, run);
+        this.#offerChain = next.then(() => undefined, () => undefined);
+        return next;
+    }
+
+    async #provideOffer(request: WebRtcTransportProvider.ProvideOfferRequest) {
         const go2rtc = streamContext.go2rtc;
         if (!go2rtc) throw new Error('go2rtc client not initialized');
 
@@ -54,20 +79,60 @@ export class MatterWebRtcTransportProviderServer extends CameraRequirements.WebR
         const hubEndpoint = this.#hubEndpoint(request.originatingEndpointId);
         const hubIceServers = request.iceServers?.length ?? 0;
 
+        const hubDiag = describeHubOffer(request.sdp);
         logger.info(
             `ProvideOffer camera=${cameraId} session=${sessionId} hubEp=${hubEndpoint} `
-            + `sdp=${request.sdp.length}ch hubIceServers=${hubIceServers}`,
+            + `hubIceServers=${hubIceServers} ${formatHubOfferDiagnostics(hubDiag)}`,
         );
+
+        const compactHub = isCompactHubOffer(request.sdp);
+        const lanPrefix = appConfig.matterHost.split('.').slice(0, 3).join('.') + '.';
+        const hubOffer = prepareHubOfferForGo2rtc(request.sdp, { lanPrefix });
+        const hubCandidatesBefore = parseSdpIceCandidates(request.sdp).length;
+        const hubCandidatesAfter = parseSdpIceCandidates(hubOffer).length;
+        if (compactHub) {
+            logger.info(
+                `Hub offer session=${sessionId} compact/Android `
+                + `candidates=${hubCandidatesBefore}→${hubCandidatesAfter}`,
+            );
+        } else if (hubCandidatesBefore !== hubCandidatesAfter) {
+            logger.info(
+                `Filtered hub offer ICE session=${sessionId} `
+                + `${hubCandidatesBefore}→${hubCandidatesAfter} (LAN host only, ice-lite hint for go2rtc)`,
+            );
+        }
+
+        const replaceSession = this.#sessions.has(sessionId);
+        const compactRetry = compactHub && go2rtc.shouldRecycleCompactHub(cameraId);
+        const recycle = replaceSession || compactRetry;
+        if (replaceSession) {
+            logger.info(`Replacing prior WebRTC session=${sessionId} camera=${cameraId}`);
+            await this.#clearSession(sessionId);
+        } else if (compactRetry) {
+            logger.info(`Recycling go2rtc for compact hub retry camera=${cameraId} session=${sessionId}`);
+        }
 
         let exchange;
         try {
-            // Hub TURN/STUN is for the controller side only; go2rtc is ice-lite host UDP.
-            exchange = await go2rtc.exchangeWebRtcOffer(cameraId, request.sdp, undefined);
+            if (compactHub) {
+                await go2rtc.prewarmWebRtcIfStale(cameraId);
+            }
+            // Hub TURN/STUN stays on the controller; go2rtc gets a LAN-only offer copy
+            // so it can become ICE controlling and nominate the host pair.
+            exchange = await go2rtc.exchangeWebRtcOffer(cameraId, hubOffer, undefined, false, {
+                recycle,
+            });
         } catch (error) {
             logger.error(`ProvideOffer failed camera=${cameraId} session=${sessionId}: ${error}`);
             throw error;
         }
-        logger.info(`go2rtc answer session=${sessionId} sdp=${exchange.answerSdp.length}ch`);
+        if (compactHub) {
+            go2rtc.markCompactHubOffer(cameraId);
+        }
+        logger.info(
+            `go2rtc answer session=${sessionId} sdp=${exchange.answerSdp.length}ch `
+            + `${describeAnswerSetup(exchange.answerSdp)}`,
+        );
 
         if (exchange.whepLocation && exchange.whepEtag) {
             const remoteCandidates = parseSdpIceCandidates(request.sdp);
@@ -88,18 +153,20 @@ export class MatterWebRtcTransportProviderServer extends CameraRequirements.WebR
             }
         }
 
+        const filteredAnswer = filterSdpToLocalBridgeCandidate(exchange.answerSdp, { host: appConfig.matterHost });
+        const allLocal = parseSdpIceCandidates(filteredAnswer);
+        const localCandidates = filterLocalBridgeCandidates(allLocal, { host: appConfig.matterHost });
+        const answerSdp = embedLocalCandidatesInAnswerSdp(filteredAnswer, localCandidates);
+
         this.#sessions.set(sessionId, {
-            answerSdp: exchange.answerSdp,
+            answerSdp,
             cameraId,
             hubEndpoint,
             whepLocation: exchange.whepLocation,
             whepEtag: exchange.whepEtag,
         });
 
-        await this.#sendAnswerToHub(sessionId, exchange.answerSdp, hubEndpoint);
-
-        const allLocal = parseSdpIceCandidates(exchange.answerSdp);
-        const localCandidates = filterLocalBridgeCandidates(allLocal, { host: appConfig.matterHost });
+        await this.#sendAnswerToHub(sessionId, answerSdp, hubEndpoint);
         if (allLocal.length !== localCandidates.length) {
             logger.info(
                 `Filtered bridge ICE candidates session=${sessionId} `
@@ -169,17 +236,20 @@ export class MatterWebRtcTransportProviderServer extends CameraRequirements.WebR
 
     override async endSession(request: WebRtcTransportProvider.EndSessionRequest) {
         const session = this.#sessions.get(request.webRtcSessionId);
+        await this.#clearSession(request.webRtcSessionId);
+        logger.info(`endSession camera=${session?.cameraId ?? '?'} session=${request.webRtcSessionId}`);
+    }
+
+    async #clearSession(sessionId: number) {
+        const session = this.#sessions.get(sessionId);
         const go2rtc = streamContext.go2rtc;
 
         if (go2rtc && session?.whepLocation) {
             await go2rtc.closeWebRtcSession(session.whepLocation);
         }
 
-        this.#sessions.delete(request.webRtcSessionId);
-        this.state.currentSessions = (this.state.currentSessions ?? []).filter(
-            s => s.id !== request.webRtcSessionId,
-        );
-        logger.info(`endSession camera=${session?.cameraId ?? '?'} session=${request.webRtcSessionId}`);
+        this.#sessions.delete(sessionId);
+        this.state.currentSessions = (this.state.currentSessions ?? []).filter(s => s.id !== sessionId);
     }
 
     #hubEndpoint(originatingEndpointId: EndpointNumber | null | undefined): EndpointNumber {

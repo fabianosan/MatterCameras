@@ -27,7 +27,6 @@ COPY --from=build /build/go2rtc /usr/local/bin/
 
 EXPOSE 1984 8554 8555 8555/udp
 ENTRYPOINT ["/sbin/tini", "--"]
-VOLUME /config
 WORKDIR /config
 
 CMD ["go2rtc", "-config", "/config/go2rtc.yaml"]

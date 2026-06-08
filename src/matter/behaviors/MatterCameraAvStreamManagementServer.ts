@@ -2,6 +2,7 @@ import { CameraAvStreamManagementServer as BaseCameraAvStreamManagementServer } 
 import { CameraAvStreamManagement } from '@matter/types/clusters/camera-av-stream-management';
 import { StreamUsage } from '@matter/types';
 import { Logger } from '@matter/general';
+import { normalizeJpeg } from '../../streaming/normalizeJpeg.js';
 import { streamContext } from './streamContext.js';
 import {
     createDefaultAudioStream,
@@ -129,6 +130,8 @@ export class MatterCameraAvStreamManagementServer extends CameraAvServer {
             logger.error(`CaptureSnapshot failed camera=${cameraId}: ${error}`);
             throw error;
         }
+
+        jpeg = normalizeJpeg(jpeg);
 
         logger.info(`CaptureSnapshot done camera=${cameraId} ${jpeg.byteLength} bytes`);
 
