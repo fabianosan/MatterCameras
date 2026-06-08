@@ -6,8 +6,8 @@ Bridge device type: **Camera `0x0142`** (bridged endpoint per RTSP camera).
 
 | Feature | Matter cluster | Bridge | SmartThings |
 |---------|----------------|--------|-------------|
-| Live view (iOS) | WebRTC Transport Provider | OK | OK |
-| Live view (Android) | WebRTC Transport Provider | Signaling OK | **DTLS blocked** (app bug) |
+| Live view (iOS) | WebRTC Transport Provider | OK | OK — fast first attempt |
+| Live view (Android) | WebRTC Transport Provider | OK | OK (2026-06-09; was signaling order, not DTLS) |
 | Snapshot / card preview | Camera AV Stream Management | OK | OK |
 | **Notification image** | `CaptureSnapshot` | OK | **OK** — JPEG appears in push notification |
 | Motion → routines | **Zone Management** `0x0550` + **OccupancySensing** | RTSP frame-diff | Hub reprofile (`softwareVersion` 301) or 61.x beta drivers |

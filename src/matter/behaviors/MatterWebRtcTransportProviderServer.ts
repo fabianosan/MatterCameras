@@ -178,20 +178,6 @@ export class MatterWebRtcTransportProviderServer extends CameraRequirements.WebR
             whepEtag: exchange.whepEtag,
         });
 
-        await this.#sendAnswerToHub(sessionId, answerSdp, hubEndpoint);
-        if (allLocal.length !== localCandidates.length) {
-            logger.info(
-                `Filtered bridge ICE candidates session=${sessionId} `
-                + `${allLocal.length}→${localCandidates.length} host=${appConfig.matterHost}`,
-            );
-        }
-        if (localCandidates.length > 0) {
-            await this.#sendIceCandidatesToHub(sessionId, localCandidates, hubEndpoint);
-            await this.#sendIceCandidatesToHub(sessionId, [
-                new WebRtcTransportDefinitions.IceCandidate({ candidate: 'end-of-candidates', sdpMid: null, sdpmLineIndex: null }),
-            ], hubEndpoint);
-        }
-
         const peerNodeId = this.#peerNodeId();
         const sessionFields: Partial<WebRtcTransportDefinitions.WebRtcSession> = {
             id: sessionId,
@@ -215,10 +201,53 @@ export class MatterWebRtcTransportProviderServer extends CameraRequirements.WebR
             logger.warn(`Failed to update currentSessions: ${error}`);
         }
 
-        return new WebRtcTransportProvider.ProvideOfferResponse({
+        const response = new WebRtcTransportProvider.ProvideOfferResponse({
             webRtcSessionId: sessionId,
             videoStreamId: request.videoStreams?.[0] ?? request.videoStreamId ?? 1,
         });
+
+        // Hub creates WebRtcTransportRequestor session on ProvideOfferResponse receipt (Matter 1.5 §11.5.7.4).
+        // Deliver answer/ICE after the command response so the hub session exists (fixes NotFound 139 after reprofile).
+        void this.#deliverHubSignalingAfterResponse(
+            sessionId,
+            answerSdp,
+            hubEndpoint,
+            localCandidates,
+            allLocal.length,
+        );
+
+        return response;
+    }
+
+    async #deliverHubSignalingAfterResponse(
+        sessionId: number,
+        answerSdp: string,
+        hubEndpoint: EndpointNumber,
+        localCandidates: WebRtcTransportDefinitions.IceCandidate[],
+        allLocalCount: number,
+    ): Promise<void> {
+        await sleep(80);
+        try {
+            await this.#sendAnswerToHub(sessionId, answerSdp, hubEndpoint);
+            if (allLocalCount !== localCandidates.length) {
+                logger.info(
+                    `Filtered bridge ICE candidates session=${sessionId} `
+                    + `${allLocalCount}→${localCandidates.length} host=${appConfig.matterHost}`,
+                );
+            }
+            if (localCandidates.length > 0) {
+                await this.#sendIceCandidatesToHub(sessionId, localCandidates, hubEndpoint);
+                await this.#sendIceCandidatesToHub(sessionId, [
+                    new WebRtcTransportDefinitions.IceCandidate({
+                        candidate: 'end-of-candidates',
+                        sdpMid: null,
+                        sdpmLineIndex: null,
+                    }),
+                ], hubEndpoint);
+            }
+        } catch (error) {
+            logger.error(`Deferred hub WebRTC signaling failed session=${sessionId}: ${error}`);
+        }
     }
 
     override async provideAnswer(request: WebRtcTransportProvider.ProvideAnswerRequest) {

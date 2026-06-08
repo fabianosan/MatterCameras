@@ -2,38 +2,64 @@
 
 Bridge: **MatterCameras** on `192.168.1.50` → SmartThings hub via Matter 1.5 Camera (`0x0142`).
 
-## Current status (2026-06-08)
+## Current status (2026-06-09)
 
 | Feature | iOS (SmartThings app) | Android |
 |---------|----------------------|---------|
 | Snapshot | OK | OK |
-| Live view (video) | **OK** (some cameras 2nd attempt); **regression possible after hub TCP reconnect** | **FAIL** — app-side DTLS (see below) |
-| Live view (audio) | **OK** (all cameras) | **FAIL** — blocked by DTLS |
+| Live view (video) | **OK** — fast first attempt | **OK** — operator confirmed 2026-06-09 |
+| Live view (audio) | **OK** | **OK** (with video) |
 
-**Working stack:** patched go2rtc + Matter app with hub-offer filtering, single bridge candidate, `prepareHubOfferForGo2rtc`, serialized `ProvideOffer` per camera, and **retry backoff** on hub `WebRtcTransportRequestor.answer` when hub returns `NotFound (139)`.
+**Working stack:** patched go2rtc + hub-offer filtering + `prepareHubOfferForGo2rtc` + serialized `ProvideOffer` + **deferred hub signaling** (see below).
 
-### iOS regression — hub TCP session resume (2026-06-08 ~23:24)
+### Root fix — `ProvideOfferResponse` before `answer` (2026-06-09)
 
-After hub **re-interview** (motion clusters / `softwareVersion` bump), the hub opened a new Matter TCP session (`peerSess 6cc3`, was UDP `6cc2`). Live view then failed even though go2rtc answered:
+Matter 1.5 §11.5.7.4: the hub **creates** the `WebRtcTransportRequestor` session when it receives **`ProvideOfferResponse`**, not when it sends `ProvideOffer`.
+
+The bridge used to invoke `answer` on the hub **before** returning `ProvideOfferResponse`. That caused:
 
 ```
-go2rtc WebRTC answer camera=cam-… mode=whep sdp=2198ch relay=0
 WebRTC answer delivery failed hubEp=0: … NotFound (139)
-WebRTC answer delivery failed hubEp=1: … UnsupportedAccess (126)
 Invoke error … provideOffer: Status=UnsupportedAccess(126)
 ```
 
-**Not a go2rtc/ICE issue** — the bridge could not deliver the SDP answer to the hub’s `WebRtcTransportRequestor` (session not ready yet on the new TCP path).
+Even when go2rtc had a valid SDP answer, the hub had no session to accept it. Retries and second app attempts sometimes worked by luck; after hub re-interview (motion deploy) the failure became consistent.
 
-**Mitigation:** answer delivery retries (200 ms → 2 s) — helps transient `NotFound`; **may not recover** if hub requestor state is stale after full re-interview (still failing 23:26 UTC on session `c21b`).
+**Fix** (`MatterWebRtcTransportProviderServer.ts`):
 
-**Workarounds:** restart SmartThings hub; retry live view in app; pull-to-refresh camera device.
+1. Return `ProvideOfferResponse` with `webRtcSessionId` immediately after go2rtc exchange.
+2. After **80 ms**, invoke `WebRtcTransportRequestor.answer` + ICE trickle (deferred `#deliverHubSignalingAfterResponse`).
+3. Keep retry backoff on `answer` for transient `NotFound`.
 
-Earlier the same evening, session `6cc2` delivered answers successfully (`WebRTC answer delivered session=1 hubEp=0`).
+**Operator result:** iOS and Android live view work on **first attempt**, noticeably faster than before (no failed `answer` round-trips or hub retries).
+
+### Historical note — Android “DTLS blocker” (2026-06-08, superseded)
+
+Earlier tests attributed Android failure to DTLS never completing in go2rtc. With correct signaling order, **Android live view works**. The DTLS symptoms were likely downstream of the hub never receiving a timely `answer` (ICE connected but media path never fully established). See [Verified test log — Android (2026-06-08, FAIL)](#verified-test-log--android-2026-06-08-fail) for the old log analysis.
 
 ---
 
-## Verified test log — iOS (2026-06-08)
+## Verified test log — iOS + Android (2026-06-09, OK)
+
+**Fix:** deferred hub signaling (`ProvideOfferResponse` before `answer`).
+
+**Operator report:** live view works on **iOS and Android**, loads much faster on first attempt (no retry loop).
+
+**Log signature (success):**
+
+```
+ProvideOffer camera=cam-… session=1 …
+go2rtc WebRTC answer camera=cam-… mode=whep sdp=2202ch relay=0
+Invoke » … provideOffer webRtcSessionId: 1 videoStreamId: 1    # response sent first
+WebRTC answer delivered session=1 hubEp=0 attempt=1
+ICE candidates delivered session=1 hubEp=0 count=1
+```
+
+**go2rtc:** `ICE connection state changed: connected` → `Handshake Completed` (iOS and Android).
+
+---
+
+## Verified test log — iOS (2026-06-08, before signaling fix)
 
 **Environment:** iPhone on LAN `192.168.40.120`, bridge `192.168.1.50:8555`, hub TURN `turn-useast1.smartthings.com`.
 
@@ -99,7 +125,7 @@ Example from logs:
 
 ---
 
-## Android blocker (confirmed 2026-06-08)
+## Android blocker (2026-06-08 — superseded; see [root fix](#root-fix--provideofferresponse-before-answer-2026-06-09))
 
 **Bridge is not the bottleneck.** On Android (`192.168.40.63`), logs consistently show:
 

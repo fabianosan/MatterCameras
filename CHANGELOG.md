@@ -68,7 +68,7 @@ See [docs/SCALING.md](docs/SCALING.md) for hardware recommendations, camera coun
 - `docs/AGENT-CONTEXT.md` — agent handoff (deploy safety, feature matrix, known issues, log commands).
 - `matterSoftwareVersion` (301) on bridged cameras to trigger SmartThings camera reprofile after new clusters.
 - Docker bind-mount `./dist:/app/dist:ro` so `quick-deploy.sh` updates running container without image rebuild.
-- SmartThings **live view (WebRTC)** working on iOS for all bridged cameras; **audio (Opus)** confirmed on all four cameras (2026-06-08, see `docs/WEBRTC-DEBUG.md`).
+- SmartThings **live view (WebRTC)** on **iOS and Android** — operator confirmed 2026-06-09; **audio (Opus)** on both platforms (see `docs/WEBRTC-DEBUG.md`).
 - Hub offer SDP diagnostics (`setup`, fingerprint, candidate count) on each `ProvideOffer`.
 - Android/compact-hub path: keep full hub ICE in go2rtc offer copy, prewarm before exchange, recycle on hub retry; inline bridge ICE candidates in answer SDP. Compact detection uses AND (small SDP + few candidates) so iOS is unaffected.
 - `scripts/watch-webrtc-logs.sh` — filtered tail of Matter + go2rtc logs for live-view test sessions.
@@ -76,9 +76,10 @@ See [docs/SCALING.md](docs/SCALING.md) for hardware recommendations, camera coun
 - go2rtc WebRTC source `ffmpeg:…#video=h264#audio=opus` for Matter/SmartThings A/V.
 
 ### Fixed
+- **Live view signaling order:** defer `WebRtcTransportRequestor.answer` until after `ProvideOfferResponse` (hub creates session on response per Matter 1.5 §11.5.7.4). Fixes `NotFound (139)` on iOS/Android, enables fast first-attempt load; earlier Android “DTLS blocker” was this bug, not an app defect.
 - Zone Management startup crash (`maxUserDefinedZones` must be ≥ 5 per Matter constraint).
 - Snapshot previews preserve camera aspect ratio (`scale=width:-1` in go2rtc); Matter response reports actual JPEG dimensions instead of forcing 640×360.
-- iOS live view after hub TCP session resume: retry `WebRtcTransportRequestor.answer` when hub returns `NotFound (139)` before session is ready.
+- Hub `answer` delivery retry backoff when `NotFound (139)` is transient (kept alongside deferred signaling).
 - Disabled go2rtc built-in STUN defaults explicitly with `ice_servers: []` in `data/go2rtc.yaml`; without that, the patched ice-lite bridge could still fail in `GetAnswer()` with `agent does not need URL with selected candidate types`.
 - Removed the `VOLUME /config` declaration from the custom go2rtc image so the bind-mounted `data/go2rtc.yaml` is not masked by an anonymous Docker volume.
 - Added a timeout to go2rtc offer exchange requests so a stuck WebRTC negotiation cannot hold the per-camera lock indefinitely and block later SmartThings attempts.
