@@ -9,7 +9,8 @@ import { StreamUsage, NodeId, EndpointNumber, FabricIndex } from '@matter/types'
 import { StatusCode as Status, StatusResponseError } from '@matter/types/common';
 import { streamContext } from './streamContext.js';
 import { disableWebRtcCommandValidation } from '../webrtcCommandValidation.js';
-import { mapMatterIceServers, matterIceToSdpFrag, parseSdpIceCandidates } from '../webrtcIce.js';
+import { filterLocalBridgeCandidates, matterIceToSdpFrag, parseSdpIceCandidates } from '../webrtcIce.js';
+import { appConfig } from '../../config/app.js';
 
 const logger = Logger.get('MatterWebRtc');
 
@@ -51,16 +52,17 @@ export class MatterWebRtcTransportProviderServer extends CameraRequirements.WebR
         const cameraId = String(this.endpoint.id);
         const sessionId = this.#allocateSessionId(request.webRtcSessionId);
         const hubEndpoint = this.#hubEndpoint(request.originatingEndpointId);
-        const iceServers = mapMatterIceServers(request.iceServers);
+        const hubIceServers = request.iceServers?.length ?? 0;
 
         logger.info(
             `ProvideOffer camera=${cameraId} session=${sessionId} hubEp=${hubEndpoint} `
-            + `sdp=${request.sdp.length}ch iceServers=${iceServers?.length ?? 0}`,
+            + `sdp=${request.sdp.length}ch hubIceServers=${hubIceServers}`,
         );
 
         let exchange;
         try {
-            exchange = await go2rtc.exchangeWebRtcOffer(cameraId, request.sdp, iceServers);
+            // Hub TURN/STUN is for the controller side only; go2rtc is ice-lite host UDP.
+            exchange = await go2rtc.exchangeWebRtcOffer(cameraId, request.sdp, undefined);
         } catch (error) {
             logger.error(`ProvideOffer failed camera=${cameraId} session=${sessionId}: ${error}`);
             throw error;
@@ -96,7 +98,14 @@ export class MatterWebRtcTransportProviderServer extends CameraRequirements.WebR
 
         await this.#sendAnswerToHub(sessionId, exchange.answerSdp, hubEndpoint);
 
-        const localCandidates = parseSdpIceCandidates(exchange.answerSdp);
+        const allLocal = parseSdpIceCandidates(exchange.answerSdp);
+        const localCandidates = filterLocalBridgeCandidates(allLocal, { host: appConfig.matterHost });
+        if (allLocal.length !== localCandidates.length) {
+            logger.info(
+                `Filtered bridge ICE candidates session=${sessionId} `
+                + `${allLocal.length}→${localCandidates.length} host=${appConfig.matterHost}`,
+            );
+        }
         if (localCandidates.length > 0) {
             await this.#sendIceCandidatesToHub(sessionId, localCandidates, hubEndpoint);
             await this.#sendIceCandidatesToHub(sessionId, [

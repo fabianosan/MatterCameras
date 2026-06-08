@@ -10,12 +10,20 @@
 
 services:
   go2rtc:
-    image: alexxit/go2rtc:latest
+    build:
+      context: ./docker/go2rtc
+    image: matter-go2rtc:patched
     container_name: matter_go2rtc
     restart: unless-stopped
     network_mode: host
     volumes:
-      - ./data/go2rtc.yaml:/config/go2rtc.yaml
+      # Read-only: app re-registers streams via API on boot; prevents go2rtc from stripping webrtc config.
+      - ./data/go2rtc.yaml:/config/go2rtc.yaml:ro
+    environment:
+      # Force pion (the WebRTC library) to emit ICE+DTLS state to go2rtc's logger
+      # so we can see why media pairs do not nominate / DTLS does not start.
+      - PION_LOG_DEBUG=all
+      - PION_LOG_TRACE=ice,dtls
     healthcheck:
       test: ["CMD", "wget", "-q", "-O", "-", "http://127.0.0.1:3203/api"]
       interval: 30s

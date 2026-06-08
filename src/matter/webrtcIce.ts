@@ -43,6 +43,26 @@ export function parseSdpIceCandidates(sdp: string): WebRtcTransportDefinitions.I
     return results;
 }
 
+/**
+ * Keep only the bridge LAN host UDP candidate before sending to the Matter hub.
+ * go2rtc also filters at source; this guards against trickle lines still in SDP.
+ */
+export function filterLocalBridgeCandidates(
+    candidates: WebRtcTransportDefinitions.IceCandidate[],
+    opts?: { host?: string; port?: string },
+): WebRtcTransportDefinitions.IceCandidate[] {
+    const host = opts?.host;
+    const port = opts?.port ?? '8555';
+
+    return candidates.filter(c => {
+        const line = c.candidate;
+        if (!/\btyp host\b/i.test(line)) return false;
+        if (!/\bUDP\b/i.test(line)) return false;
+        if (host && !line.includes(host)) return false;
+        return line.includes(` ${port} `) || line.endsWith(` ${port}`);
+    });
+}
+
 /** Append trickle candidates from go2rtc WebSocket into an SDP answer. */
 export function appendTrickleCandidatesToSdp(sdp: string, trickleCandidates: string[]): string {
     if (!trickleCandidates.length) return sdp;

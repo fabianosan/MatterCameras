@@ -1,0 +1,22 @@
+--- a/internal/webrtc/candidates.go
++++ b/internal/webrtc/candidates.go
+@@ -76,6 +76,20 @@ func FilterCandidate(candidate *pion.ICECandidate) bool {
+ 		return false
+ 	}
+ 
++	// Matter/SmartThings bridge: advertise only the LAN host UDP socket.
++	// Relay, srflx, and TCP ephemeral candidates confuse the hub ICE scorer
++	// and prevent nomination even when a host pair has state=succeeded.
++	if candidate.Typ != pion.ICECandidateTypeHost {
++		return false
++	}
++	if candidate.Protocol != pion.ICECandidateProtocolUdp {
++		return false
++	}
++	if filters.IPs != nil && !core.Contains(filters.IPs, candidate.Address) {
++		return false
++	}
++
+ 	// remove any Docker-like IP from candidates
+ 	if ip := net.ParseIP(candidate.Address); ip != nil && xnet.Docker.Contains(ip) {
+ 		return false

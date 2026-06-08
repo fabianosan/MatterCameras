@@ -60,6 +60,11 @@ See [docs/SCALING.md](docs/SCALING.md) for hardware recommendations, camera coun
 
 ## [Unreleased]
 
+### Changed
+- go2rtc is built from source (`docker/go2rtc/`) with Matter/SmartThings ICE patches: `MaxBindingRequests` 7→100, `ice-lite` on the bridge, and host-UDP-only candidate filtering (`docs/WEBRTC-DEBUG.md`).
+- Matter WebRTC provider no longer forwards hub TURN/STUN into go2rtc; only the LAN host UDP `:8555` candidate is sent back to the hub.
+- Default `data/go2rtc.yaml`: UDP4-only network filter, no bridge-side STUN/TURN.
+
 ### Planned
 
 - ONVIF auto-discovery

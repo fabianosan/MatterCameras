@@ -1,0 +1,20 @@
+--- a/pkg/webrtc/api.go
++++ b/pkg/webrtc/api.go
+@@ -45,6 +45,17 @@ func NewServerAPI(network, address string, filters *Filters) (*webrtc.API, error
+ 	// fix https://github.com/pion/webrtc/pull/2407
+ 	s.SetDTLSInsecureSkipHelloVerify(true)
+ 
++	// SmartThings/Matter clients on LAN need ~25ms for STUN binding responses,
++	// but pion's default MaxBindingRequests (7) is exhausted within ~11ms when
++	// the ICE agent bursts pings across all candidate pairs at connect time.
++	// Raise the limit so pairs remain InProgress until a response arrives.
++	s.SetICEMaxBindingRequests(100)
++
++	// Bridge is always reached on a well-known LAN host:port; the hub (iOS) is
++	// controlling. ice-lite stops go2rtc from running a full ICE agent and
++	// avoids nomination stalls when many relay/srflx candidates are in play.
++	s.SetLite(true)
++
+ 	if filters != nil && filters.Loopback {
+ 		s.SetIncludeLoopbackCandidate(true)
+ 	}
