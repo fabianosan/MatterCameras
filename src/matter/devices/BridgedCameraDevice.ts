@@ -4,6 +4,7 @@ import { MatterCameraAvStreamManagementServer } from '../behaviors/MatterCameraA
 import { MatterWebRtcTransportProviderServer } from '../behaviors/MatterWebRtcTransportProviderServer.js';
 import { cameraAvStreamDefaults } from './cameraAvStreamDefaults.js';
 import { Camera } from '../../types/index.js';
+import { appVersion } from '../../config/version.js';
 
 /**
  * Matter 1.5 Camera device type (0x0142) exposed as a bridged endpoint.
@@ -27,8 +28,8 @@ export function bridgedCameraOptions(camera: Camera) {
             uniqueId: `${camera.id}-uid`,
             hardwareVersion: 1,
             hardwareVersionString: '1.0',
-            softwareVersion: 1,
-            softwareVersionString: '1.0.0',
+            softwareVersion: 300,
+            softwareVersionString: appVersion,
         },
         cameraAvStreamManagement: cameraAvStreamDefaults(),
     };

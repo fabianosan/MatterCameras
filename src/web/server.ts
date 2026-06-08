@@ -4,6 +4,7 @@ import { PROJECT_ROOT } from '../config/paths.js';
 import { storage } from '../storage/db.js';
 import { bridge } from '../matter/Bridge.js';
 import { appConfig } from '../config/app.js';
+import { appVersion } from '../config/version.js';
 import { Camera } from '../types/index.js';
 import { Logger } from '../utils/Logger.js';
 
@@ -24,7 +25,7 @@ app.get('/', async (req, res) => {
     const cameras = storage.getCameras();
     const pairingInfo = await bridge.getPairingInfo();
     const bridgeStatus = bridge.isCommissioned() ? 'Commissioned' : 'Ready to Pair';
-    res.render('index', { cameras, pairingInfo, bridgeStatus });
+    res.render('index', { cameras, pairingInfo, bridgeStatus, appVersion });
 });
 
 app.post('/api/cameras', async (req, res) => {

@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 Repository: [github.com/patricktd/MatterCameras](https://github.com/patricktd/MatterCameras)
 
+> **Project status:** pre-1.0 **beta**. Versions stay below `1.0.0` until the bridge is considered production-stable. `1.0.0` will mark the first stable release.
+
 ---
 
 ## System overview
@@ -58,29 +60,23 @@ See [docs/SCALING.md](docs/SCALING.md) for hardware recommendations, camera coun
 
 ## [Unreleased]
 
-### Added
-
-- Cursor agent rule (`.cursor/rules/documentation.mdc`) requiring changelog updates for major changes and English-only documentation
-
-### Changed
-
-- All project documentation translated to English (`CHANGELOG.md`, `docs/SCALING.md`, `README.md`, deploy comments)
-
 ### Planned
 
 - ONVIF auto-discovery
 - Motion events via Matter
 - Web UI warning when adding more than 4 cameras
 - Automated tests
+- First stable release (`1.0.0`)
 
 ---
 
-## [1.0.0] — 2026-06-08
+## [0.3.0-beta] — 2026-06-08
 
-First functional release synced to GitHub, with stable streaming, camera management in the UI, and scaling documentation.
+Current beta milestone: streaming, camera management, documentation, and Web UI polish. Synced to GitHub.
 
 ### Added
 
+- Cursor agent rule (`.cursor/rules/documentation.mdc`) requiring changelog updates for major changes and English-only documentation
 - **Camera editing** in the Web UI (name, RTSP URL, codec) without removing/recreating the endpoint
 - **REST API** `POST /api/cameras/:id` to update existing cameras
 - **Live log panel** on the dashboard (`GET /api/logs`, 2 s polling)
@@ -94,13 +90,17 @@ First functional release synced to GitHub, with stable streaming, camera managem
 - **ICE trickle** — Matter candidates mapped to SDP and back (`webrtcIce.ts`)
 - **JPEG snapshots** via Camera AV Stream Management cluster (48 KB limit, max resolution 640×360)
 - **Scaling documentation** in `docs/SCALING.md`
+- Web UI quick-start wizard, external CSS/JS assets, info bar with version badge
+- `src/config/version.ts` — version read from `package.json` (UI + Matter device metadata)
 
 ### Changed
 
+- Project version set to **0.3.0-beta** (pre-1.0; not a stable release)
+- All project documentation translated to English (`CHANGELOG.md`, `docs/SCALING.md`, `README.md`, deploy comments)
 - `Go2RTCClient` rewritten: health check, 404 retry, ICE normalization, WS + HTTP exchange
 - Startup order: cameras registered **before** `bridge.start()` (hub does not see an empty `partsList`)
 - `docker-compose.yml`: go2rtc healthcheck with `depends_on: service_healthy`
-- Web UI: card layout, inline actions (edit/cancel), header styles
+- Web UI: card layout, inline actions (edit/cancel), troubleshooting log panel
 
 ### Fixed
 
@@ -192,8 +192,8 @@ Matter Camera bridge MVP with Docker deployment and basic Web UI.
 3. Update `version` in `package.json` to stay in sync.
 4. Use commit messages that map cleanly to changelog entries (e.g. `feat:`, `fix:`, `docs:`).
 
-[Unreleased]: https://github.com/patricktd/MatterCameras/compare/v1.0.0...HEAD
-[1.0.0]: https://github.com/patricktd/MatterCameras/compare/v0.2.0...v1.0.0
+[Unreleased]: https://github.com/patricktd/MatterCameras/compare/v0.3.0-beta...HEAD
+[0.3.0-beta]: https://github.com/patricktd/MatterCameras/compare/v0.2.0...v0.3.0-beta
 [0.2.0]: https://github.com/patricktd/MatterCameras/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/patricktd/MatterCameras/compare/v0.0.1...v0.1.0
 [0.0.1]: https://github.com/patricktd/MatterCameras/releases/tag/v0.0.1

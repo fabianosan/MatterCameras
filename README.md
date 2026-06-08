@@ -1,5 +1,7 @@
 # MatterCameras
 
+> **Beta (pre-1.0)** — current version `0.3.0-beta`. Not production-stable yet.
+
 Bridge RTSP/ONVIF cameras into **Matter 1.5 Camera** devices for SmartThings (Aeotec Hub v2) and other Matter controllers.
 
 ## Architecture
@@ -78,7 +80,7 @@ Set `matterHost` to your Mac LAN IP or `0.0.0.0` for local testing. Production t
 - **[CHANGELOG.md](CHANGELOG.md)** — version history, system overview, and roadmap
 - **[docs/SCALING.md](docs/SCALING.md)** — practical SmartThings limits, ffmpeg load, and recommended hardware per camera count
 
-## Status (MVP)
+## Status (beta)
 
 - [x] Matter 1.5 Camera device type (bridged)
 - [x] Camera AV Stream Management (1x H.264 LiveView)
