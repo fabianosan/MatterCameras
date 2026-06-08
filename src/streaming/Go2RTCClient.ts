@@ -1,6 +1,10 @@
 import { Logger } from '@matter/general';
+import { appendTrickleCandidatesToSdp } from '../matter/webrtcIce.js';
 
 const logger = Logger.get('Go2RTCClient');
+
+const WS_ICE_GATHER_MS = 6_000;
+const WS_ICE_QUIET_MS = 1_000;
 
 export interface Go2RtcIceServer {
     urls: string[];
@@ -237,7 +241,8 @@ export class Go2RTCClient {
     }
 
     /**
-     * Exchange SDP offer with go2rtc. Hub TURN/STUN uses JSON API (go2rtc WHEP often omits Location).
+     * Exchange SDP offer with go2rtc.
+     * Hub TURN/STUN uses WebSocket API — HTTP JSON ignores ice_servers in go2rtc.
      */
     async exchangeWebRtcOffer(
         streamId: string,
@@ -249,52 +254,58 @@ export class Go2RTCClient {
             await this.ensureStream(streamId);
 
             const streamName = this.webrtcStreamName(streamId);
-            const url = `${this.baseUrl}/api/webrtc?src=${encodeURIComponent(streamName)}`;
             const source = this.sources.get(streamId);
 
-            let response: Response;
-            let mode: 'json' | 'whep';
+            try {
+                if (iceServers?.length) {
+                    const normalized = this.#normalizeIceServers(iceServers);
+                    const answerSdp = await this.#exchangeWebRtcViaWebSocket(streamName, offerSdp, normalized);
+                    const relayCount = (answerSdp.match(/ typ relay /g) ?? []).length;
+                    logger.info(
+                        `go2rtc WebRTC answer camera=${streamId} mode=ws sdp=${answerSdp.length}ch `
+                        + `iceServers=${normalized.length} relay=${relayCount}`,
+                    );
+                    return { answerSdp };
+                }
 
-            if (iceServers?.length) {
-                mode = 'json';
-                response = await fetch(url, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-                    body: JSON.stringify({ type: 'offer', sdp: offerSdp, ice_servers: iceServers }),
-                });
-            } else {
-                mode = 'whep';
-                response = await fetch(url, {
+                const url = `${this.baseUrl}/api/webrtc?src=${encodeURIComponent(streamName)}`;
+                const response = await fetch(url, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/sdp', Accept: 'application/sdp' },
                     body: offerSdp,
                 });
-            }
 
-            if (response.status === 404 && !retried) {
-                await this.ensureStream(streamId);
-                return this.exchangeWebRtcOffer(streamId, offerSdp, iceServers, true);
-            }
+                if (response.status === 404 && !retried) {
+                    await this.ensureStream(streamId);
+                    return this.exchangeWebRtcOffer(streamId, offerSdp, iceServers, true);
+                }
 
-            if (!response.ok) {
-                const body = await response.text().catch(() => '');
-                throw new Error(
-                    `go2rtc WebRTC failed camera=${streamId}${source ? ` (${source.name})` : ''} `
-                    + `mode=${mode} (${response.status}): ${body || response.statusText}`,
+                if (!response.ok) {
+                    const body = await response.text().catch(() => '');
+                    throw new Error(
+                        `go2rtc WebRTC failed camera=${streamId}${source ? ` (${source.name})` : ''} `
+                        + `mode=whep (${response.status}): ${body || response.statusText}`,
+                    );
+                }
+
+                const whepLocation = response.headers.get('location') ?? undefined;
+                const whepEtag = response.headers.get('etag') ?? undefined;
+                const answerSdp = await this.#parseAnswerSdp(response);
+                const relayCount = (answerSdp.match(/ typ relay /g) ?? []).length;
+
+                logger.info(
+                    `go2rtc WebRTC answer camera=${streamId} mode=whep sdp=${answerSdp.length}ch `
+                    + `relay=${relayCount} whep=${whepLocation ? 'yes' : 'no'}`,
                 );
+
+                return { answerSdp, whepLocation, whepEtag };
+            } catch (error) {
+                if (!retried) {
+                    await this.ensureStream(streamId);
+                    return this.exchangeWebRtcOffer(streamId, offerSdp, iceServers, true);
+                }
+                throw error;
             }
-
-            const whepLocation = response.headers.get('location') ?? undefined;
-            const whepEtag = response.headers.get('etag') ?? undefined;
-            const answerSdp = await this.#parseAnswerSdp(response);
-            const relayCount = (answerSdp.match(/ typ relay /g) ?? []).length;
-
-            logger.info(
-                `go2rtc WebRTC answer camera=${streamId} mode=${mode} sdp=${answerSdp.length}ch `
-                + `iceServers=${iceServers?.length ?? 0} relay=${relayCount} whep=${whepLocation ? 'yes' : 'no'}`,
-            );
-
-            return { answerSdp, whepLocation, whepEtag };
         });
     }
 
@@ -397,6 +408,117 @@ export class Go2RTCClient {
             return rtspUrl;
         }
         return `ffmpeg:${rtspUrl}#video=h264`;
+    }
+
+    #normalizeIceServers(iceServers: Go2RtcIceServer[]): Go2RtcIceServer[] {
+        return iceServers.map(server => ({
+            urls: server.urls.flatMap(url => (url.includes(',') ? url.split(',') : [url])).map(u => u.trim()).filter(Boolean),
+            username: server.username,
+            credential: server.credential,
+        })).filter(s => s.urls.length > 0);
+    }
+
+    /**
+     * go2rtc WebSocket handler honors ice_servers; HTTP POST application/json does not.
+     */
+    async #exchangeWebRtcViaWebSocket(
+        streamName: string,
+        offerSdp: string,
+        iceServers: Go2RtcIceServer[],
+    ): Promise<string> {
+        const wsBase = this.baseUrl.replace(/^http/i, 'ws');
+        const wsUrl = `${wsBase}/api/ws?src=${encodeURIComponent(streamName)}`;
+
+        return new Promise((resolve, reject) => {
+            const ws = new WebSocket(wsUrl);
+            const trickleCandidates: string[] = [];
+            let answerSdp = '';
+            let settled = false;
+            let quietTimer: ReturnType<typeof setTimeout> | undefined;
+            let hardTimer: ReturnType<typeof setTimeout>;
+
+            const cleanup = () => {
+                clearTimeout(hardTimer);
+                if (quietTimer) clearTimeout(quietTimer);
+                if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) {
+                    ws.close();
+                }
+            };
+
+            const finish = () => {
+                if (settled) return;
+                settled = true;
+                cleanup();
+                if (!answerSdp) {
+                    reject(new Error('go2rtc WebSocket closed without SDP answer'));
+                    return;
+                }
+                resolve(appendTrickleCandidatesToSdp(answerSdp, trickleCandidates));
+            };
+
+            const bumpQuietTimer = () => {
+                if (quietTimer) clearTimeout(quietTimer);
+                quietTimer = setTimeout(finish, WS_ICE_QUIET_MS);
+            };
+
+            hardTimer = setTimeout(() => {
+                if (answerSdp) {
+                    finish();
+                } else {
+                    settled = true;
+                    cleanup();
+                    reject(new Error(`go2rtc WebSocket ICE exchange timeout (${WS_ICE_GATHER_MS}ms)`));
+                }
+            }, WS_ICE_GATHER_MS);
+
+            ws.addEventListener('open', () => {
+                ws.send(JSON.stringify({
+                    type: 'webrtc',
+                    value: {
+                        type: 'offer',
+                        sdp: offerSdp,
+                        ice_servers: iceServers,
+                    },
+                }));
+            });
+
+            ws.addEventListener('message', event => {
+                let msg: { type?: string; value?: unknown };
+                try {
+                    msg = JSON.parse(String(event.data)) as { type?: string; value?: unknown };
+                } catch {
+                    return;
+                }
+
+                if (msg.type === 'webrtc') {
+                    const desc = msg.value as { type?: string; sdp?: string };
+                    if (desc?.type === 'answer' && desc.sdp) {
+                        answerSdp = desc.sdp;
+                        bumpQuietTimer();
+                    }
+                } else if (msg.type === 'webrtc/answer' && typeof msg.value === 'string') {
+                    answerSdp = msg.value;
+                    bumpQuietTimer();
+                } else if (msg.type === 'webrtc/candidate' && typeof msg.value === 'string' && msg.value) {
+                    trickleCandidates.push(msg.value);
+                    bumpQuietTimer();
+                }
+            });
+
+            ws.addEventListener('error', () => {
+                if (!settled) {
+                    settled = true;
+                    cleanup();
+                    reject(new Error('go2rtc WebSocket connection failed'));
+                }
+            });
+
+            ws.addEventListener('close', () => {
+                if (!settled && answerSdp) {
+                    finish();
+                }
+            });
+        });
     }
 
     async #withLock<T>(streamId: string, fn: () => Promise<T>): Promise<T> {

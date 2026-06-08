@@ -73,14 +73,19 @@ Dados persistentes em `./data` (câmeras, Matter fabric, go2rtc config).
 
 Set `matterHost` to your Mac LAN IP or `0.0.0.0` for local testing. Production target remains `192.168.1.50`.
 
+## Documentation
+
+- **[CHANGELOG.md](CHANGELOG.md)** — histórico de versões, visão geral do sistema e roadmap
+- **[docs/SCALING.md](docs/SCALING.md)** — limites práticos para SmartThings, carga ffmpeg e hardware recomendado por número de câmeras
+
 ## Status (MVP)
 
 - [x] Matter 1.5 Camera device type (bridged)
 - [x] Camera AV Stream Management (1x H.264 LiveView)
-- [x] WebRTC signaling via go2rtc
-- [ ] ICE trickle / remote viewing
+- [x] WebRTC signaling via go2rtc (WebSocket + hub TURN)
+- [x] JPEG snapshots via go2rtc
 - [ ] ONVIF auto-discovery
-- [ ] Snapshot / motion events
+- [ ] Motion events
 
 ## Repository
 

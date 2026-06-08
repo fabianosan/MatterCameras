@@ -43,6 +43,40 @@ export function parseSdpIceCandidates(sdp: string): WebRtcTransportDefinitions.I
     return results;
 }
 
+/** Append trickle candidates from go2rtc WebSocket into an SDP answer. */
+export function appendTrickleCandidatesToSdp(sdp: string, trickleCandidates: string[]): string {
+    if (!trickleCandidates.length) return sdp;
+
+    const existing = new Set<string>();
+    for (const line of sdp.split(/\r?\n/)) {
+        if (line.startsWith('a=candidate:')) {
+            existing.add(line);
+        }
+    }
+
+    const additions: string[] = [];
+    for (const raw of trickleCandidates) {
+        const trimmed = raw.trim();
+        if (!trimmed) continue;
+
+        const line = trimmed.startsWith('a=candidate:')
+            ? trimmed
+            : trimmed.startsWith('candidate:')
+                ? `a=${trimmed}`
+                : `a=candidate:${trimmed}`;
+
+        if (!existing.has(line)) {
+            existing.add(line);
+            additions.push(line);
+        }
+    }
+
+    if (!additions.length) return sdp;
+
+    const suffix = `${additions.join('\r\n')}\r\n`;
+    return sdp.endsWith('\r\n') ? `${sdp}${suffix}` : `${sdp}\r\n${suffix}`;
+}
+
 /** Build WHEP trickle-ice-sdpfrag body from Matter ICE candidates. */
 export function matterIceToSdpFrag(candidates: WebRtcTransportDefinitions.IceCandidate[]): string {
     const lines: string[] = [];
