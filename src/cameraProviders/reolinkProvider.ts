@@ -51,7 +51,7 @@ export const reolinkProvider: CameraAddProvider = {
     meta: {
         id: 'reolink',
         label: 'Reolink',
-        description: 'Connect with camera or NVR IP and credentials — RTSP path is built automatically.',
+        description: 'Sign in to a Reolink camera or NVR and fill the stream automatically.',
         discoverable: true,
     },
 

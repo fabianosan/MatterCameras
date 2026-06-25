@@ -1,7 +1,15 @@
-<%- include('partials/header', { pageTitle: 'Dashboard', bridgeStatus, appVersion, activePage: 'dashboard' }) %>
+<%- include('partials/header', { pageTitle: 'Dashboard', bridgeStatus, appVersion, activePage: 'dashboard', returnTo: '/' }) %>
 
     <% const isCommissioned = bridgeStatus === 'Commissioned'; %>
-    <% const addFormOpen = cameras.length === 0; %>
+    <% const addSourceLabel = (source, manufacturer, model) => {
+        if (source === 'unifi-protect') return 'UniFi Protect';
+        if (source === 'reolink') return 'Reolink';
+        if (source === 'tapo-sonoff') return 'Tapo / Sonoff';
+        if (source === 'onvif') return 'ONVIF';
+        if (source === 'manual') return 'Manual RTSP';
+        const fallback = [manufacturer, model].filter(Boolean).join(' ');
+        return fallback || 'Unknown source';
+    }; %>
 
     <div class="main-grid">
 
@@ -15,28 +23,21 @@
         <% } %>
 
         <div>
-            <div class="card">
-                <div class="card-header-row card-header-row--actions">
-                    <button type="button" id="toggle-add-camera" class="btn btn-sm">
-                        <%= addFormOpen ? '− Cancel' : '+ Add Camera' %>
-                    </button>
-                </div>
+            <div class="dashboard-stack">
+                <section class="card dashboard-toolbar" aria-label="Dashboard summary">
+                    <a href="/cameras/add" class="btn">Add Camera</a>
+                    <div class="dashboard-toolbar__stats">
+                        <div class="dashboard-toolbar__stat">
+                            <span class="dashboard-toolbar__value"><%= cameras.length %></span>
+                            <span class="dashboard-toolbar__label"><%= cameras.length === 1 ? 'camera' : 'cameras' %></span>
+                        </div>
+                    </div>
+                </section>
 
-                <%- include('partials/add-camera-panel', { addFormOpen, isCommissioned, protectController }) %>
-            </div>
-
-            <% if (cameras.length === 0) { %>
-                <div class="empty-state">
-                    <p>No cameras added yet. Click <strong>+ Add Camera</strong> and pick UniFi Protect, Reolink, ONVIF, or paste an RTSP URL.</p>
-                    <% if (!isCommissioned) { %>
-                        <p style="font-size: 0.8rem;">Tip: pair the bridge with SmartThings first, then add your cameras.</p>
-                    <% } %>
-                </div>
-            <% } %>
-
-            <div class="camera-list">
-                <% cameras.forEach(cam => { %>
-                    <div class="camera-card" data-camera-id="<%= cam.id %>">
+                <% if (cameras.length > 0) { %>
+                    <div class="camera-list">
+                    <% cameras.forEach(cam => { %>
+                        <div class="camera-card" data-camera-id="<%= cam.id %>">
                         <div class="camera-view">
                             <div class="camera-preview">
                                 <div class="camera-preview-placeholder">No signal</div>
@@ -70,6 +71,16 @@
                         </div>
 
                         <form class="camera-edit hidden" action="/api/cameras/<%= cam.id %>" method="POST">
+                            <div class="camera-edit-head">
+                                <p class="section-kicker">Editing camera</p>
+                                <h3><%= cam.name %></h3>
+                                <p class="field-hint camera-edit-source">
+                                    Type: <%= addSourceLabel(cam.addSource, cam.manufacturer, cam.model) %>
+                                </p>
+                            </div>
+
+                            <input type="hidden" name="addSource" value="<%= cam.addSource || '' %>">
+
                             <label>Camera Name</label>
                             <input type="text" name="name" value="<%= cam.name %>" required>
 
@@ -90,6 +101,7 @@
                                     <%- include('partials/motion-options', {
                                         idPrefix: 'edit-' + cam.id,
                                         selectedMotion: cam.motionSource || 'frame-diff',
+                                        addSource: cam.addSource || '',
                                         onvifUrl: cam.onvifUrl || '',
                                         protectHost: cam.protectHost || '',
                                         protectCameraId: cam.protectCameraId || '',
@@ -107,8 +119,10 @@
                                 <button type="button" class="btn btn-secondary btn-sm btn-cancel">Cancel</button>
                             </div>
                         </form>
+                        </div>
+                    <% }) %>
                     </div>
-                <% }) %>
+                <% } %>
             </div>
         </div>
 
@@ -152,17 +166,6 @@
                     <button type="button" onclick="window.location.reload()" class="btn btn-ghost">Refresh QR</button>
                 </div>
 
-                <div class="danger-zone">
-                    <h3>Reset Pairing</h3>
-                    <p>
-                        Factory-reset removes all Matter pairings. You will need to scan the QR code again in SmartThings.
-                        Your camera list is not affected.
-                    </p>
-                    <form action="/api/reset" method="POST"
-                        onsubmit="return confirm('WARNING: This will factory reset the Matter Bridge and remove all pairings. Are you sure?');">
-                        <button type="submit" class="btn btn-danger" style="width: 100%;">Reset Pairing</button>
-                    </form>
-                </div>
             </div>
         </div>
 
@@ -185,6 +188,7 @@
         </details>
     </div>
 
+    <script src="/js/motion-options.js"></script>
     <script src="/js/dashboard.js"></script>
 
     <%- include('partials/footer') %>

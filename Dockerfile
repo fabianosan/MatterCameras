@@ -15,6 +15,7 @@ COPY public ./public
 RUN npm run build && npm prune --omit=dev
 
 ENV NODE_ENV=production
+ENV MATTER_CAMERAS_MANAGED_RESTART=1
 ENV storage.path=/app/data
 
 CMD ["node", "dist/main.js"]

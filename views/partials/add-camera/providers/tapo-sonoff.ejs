@@ -1,0 +1,28 @@
+<section class="provider-config-section" data-provider-panel="tapo-sonoff">
+    <div class="provider-config-section__header">
+        <div>
+            <p class="section-kicker">Device access</p>
+            <h3>Connect to Tapo or Sonoff</h3>
+            <p class="field-hint">Use the camera account from the app, not the cloud login.</p>
+        </div>
+    </div>
+
+    <div class="provider-creds provider-creds--panel">
+        <label for="tapo-host">Camera IP</label>
+        <input type="text" id="tapo-host" placeholder="192.168.x.x" autocomplete="off">
+
+        <label for="tapo-user">Camera Account username</label>
+        <input type="text" id="tapo-user" placeholder="admin" autocomplete="username">
+
+        <label for="tapo-pass">Camera Account password</label>
+        <input type="password" id="tapo-pass" placeholder="password" autocomplete="current-password">
+    </div>
+
+    <div class="provider-actions">
+        <button type="button" class="btn btn-secondary btn-sm provider-discover-btn" data-provider="tapo-sonoff">
+            Load camera
+        </button>
+    </div>
+
+    <p class="field-hint provider-inline-note">These cameras often expose ONVIF on port 2020 and can fill motion defaults automatically.</p>
+</section>

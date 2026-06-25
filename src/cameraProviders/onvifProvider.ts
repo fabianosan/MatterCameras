@@ -7,7 +7,7 @@ export const onvifProvider: CameraAddProvider = {
     meta: {
         id: 'onvif',
         label: 'ONVIF',
-        description: 'Scan the LAN (UDP 3702) or connect to a known ONVIF endpoint.',
+        description: 'Scan the local network for ONVIF cameras and load one into the form.',
         discoverable: true,
     },
 

@@ -1,0 +1,19 @@
+<%- include('partials/header', {
+    pageTitle: 'Add Camera',
+    bridgeStatus,
+    appVersion,
+    activePage: 'add-camera',
+    bodyClass: 'page-add-camera',
+    extraStylesheets: ['/css/add-camera.css'],
+    returnTo: '/cameras/add',
+}) %>
+
+    <div class="setup-page">
+        <section class="provider-catalog">
+            <% providers.forEach(provider => { %>
+                <%- include('partials/add-camera/provider-card', { provider }) %>
+            <% }) %>
+        </section>
+    </div>
+
+    <%- include('partials/footer') %>

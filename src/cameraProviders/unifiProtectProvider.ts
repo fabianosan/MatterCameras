@@ -36,7 +36,7 @@ export const unifiProtectProvider: CameraAddProvider = {
     meta: {
         id: 'unifi-protect',
         label: 'UniFi Protect',
-        description: 'Log in to your Protect controller and pick adopted cameras — RTSP is filled automatically.',
+        description: 'Sign in to Protect and choose the cameras you want to add.',
         discoverable: true,
     },
 

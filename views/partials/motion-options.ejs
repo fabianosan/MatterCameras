@@ -1,5 +1,6 @@
 <% const motionValue = typeof selectedMotion !== 'undefined' ? selectedMotion : 'auto'; %>
-<div class="motion-options-root" data-motion-root="<%= idPrefix %>">
+<% const motionAddSource = typeof addSource !== 'undefined' ? addSource : ''; %>
+<div class="motion-options-root" data-motion-root="<%= idPrefix %>" data-add-source="<%= motionAddSource %>">
     <label for="<%= idPrefix %>-motion">Motion detection</label>
     <select id="<%= idPrefix %>-motion" name="motionSource" class="motion-source-select">
         <option value="auto" <%= motionValue === 'auto' ? 'selected' : '' %>>Auto (recommended)</option>
@@ -10,7 +11,7 @@
     </select>
 
     <p class="field-hint motion-hint" data-show-for="auto">
-        Tries UniFi Protect → Reolink → ONVIF → frame diff. Fill only the sections that apply to this camera.
+        Tries UniFi Protect → Reolink → ONVIF → frame diff. When the camera type is known, only the matching settings are shown.
     </p>
     <p class="field-hint motion-hint" data-show-for="frame-diff">
         Compares low-res JPEG frames from the stream. No vendor settings required.

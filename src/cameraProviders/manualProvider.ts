@@ -5,7 +5,7 @@ export const manualProvider: CameraAddProvider = {
     meta: {
         id: 'manual',
         label: 'Manual RTSP',
-        description: 'Paste an RTSP or RTSPS URL from your camera or NVR.',
+        description: 'Paste your own RTSP or RTSPS stream URL.',
         discoverable: false,
     },
 

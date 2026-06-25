@@ -47,6 +47,18 @@
             <input type="hidden" name="returnTo" value="/options">
             <button type="submit" class="btn btn-ghost btn-sm">Restart Bridge</button>
         </form>
+
+        <div class="danger-zone">
+            <h3>Reset Pairing</h3>
+            <p>
+                Factory-reset removes all Matter pairings. You will need to scan the QR code again in SmartThings.
+                Your camera list is not affected.
+            </p>
+            <form action="/api/reset" method="POST"
+                onsubmit="return confirm('WARNING: This will factory reset the Matter Bridge and remove all pairings. Are you sure?');">
+                <button type="submit" class="btn btn-danger btn-sm">Reset Pairing</button>
+            </form>
+        </div>
     </div>
 
     <%- include('partials/footer') %>

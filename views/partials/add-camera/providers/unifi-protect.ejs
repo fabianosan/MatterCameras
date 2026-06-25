@@ -1,0 +1,41 @@
+<section class="provider-config-section" data-provider-panel="unifi-protect">
+    <div class="provider-config-section__header">
+        <div>
+            <p class="section-kicker">Controller access</p>
+            <h3>Sign in to UniFi Protect</h3>
+            <p class="field-hint">If your cameras already appear in Protect, sign in here and choose what to add.</p>
+        </div>
+    </div>
+
+    <div class="provider-creds provider-creds--panel">
+        <label for="unifi-host">Controller IP / hostname</label>
+        <input type="text" id="unifi-host" placeholder="192.168.x.x" autocomplete="off"
+            value="<%= typeof protectController !== 'undefined' && protectController ? protectController.host : '' %>">
+
+        <label for="unifi-user">Local user</label>
+        <input type="text" id="unifi-user" placeholder="admin" autocomplete="username"
+            value="<%= typeof protectController !== 'undefined' && protectController ? protectController.username : '' %>">
+
+        <label for="unifi-pass">Password</label>
+        <input type="password" id="unifi-pass" placeholder="<%= typeof protectController !== 'undefined' && protectController && protectController.hasPassword ? '•••••••• (saved)' : 'password' %>" autocomplete="current-password">
+    </div>
+
+    <label class="checkbox-row">
+        <input type="checkbox" id="unifi-save-controller" checked>
+        Remember controller login on this bridge
+    </label>
+
+    <div class="provider-actions provider-actions--wrap">
+        <button type="button" class="btn btn-secondary btn-sm provider-discover-btn" data-provider="unifi-protect">
+            Show cameras
+        </button>
+        <button type="button" class="btn btn-secondary btn-sm" id="unifi-import-all-btn">
+            Import all new
+        </button>
+        <button type="button" class="btn btn-secondary btn-sm" id="unifi-sync-existing-btn">
+            Link existing cameras
+        </button>
+    </div>
+
+    <p class="field-hint provider-inline-note">Use Import all for a first sync. Use Link existing when the cameras are already in this bridge.</p>
+</section>

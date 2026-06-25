@@ -1,0 +1,28 @@
+<section class="provider-config-section" data-provider-panel="reolink">
+    <div class="provider-config-section__header">
+        <div>
+            <p class="section-kicker">Device access</p>
+            <h3>Connect to Reolink</h3>
+            <p class="field-hint">Enter the camera or NVR login and let the helper fill the stream for you.</p>
+        </div>
+    </div>
+
+    <div class="provider-creds provider-creds--panel">
+        <label for="reolink-host">Host IP</label>
+        <input type="text" id="reolink-host" placeholder="192.168.x.x" autocomplete="off">
+
+        <label for="reolink-user">Username</label>
+        <input type="text" id="reolink-user" placeholder="admin" autocomplete="username">
+
+        <label for="reolink-pass">Password</label>
+        <input type="password" id="reolink-pass" placeholder="password" autocomplete="current-password">
+    </div>
+
+    <div class="provider-actions">
+        <button type="button" class="btn btn-secondary btn-sm provider-discover-btn" data-provider="reolink">
+            Load camera
+        </button>
+    </div>
+
+    <p class="field-hint provider-inline-note">For NVRs with more than one channel, the helper will show each available channel.</p>
+</section>

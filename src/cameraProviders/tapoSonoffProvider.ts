@@ -32,7 +32,7 @@ export const tapoSonoffProvider: CameraAddProvider = {
     meta: {
         id: 'tapo-sonoff',
         label: 'Tapo / Sonoff',
-        description: 'Connect by camera IP — ONVIF on port 2020 (Tapo Camera Account credentials).',
+        description: 'Use the camera account from the app to fill the stream automatically.',
         discoverable: true,
     },
 

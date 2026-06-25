@@ -28,6 +28,7 @@ import { setBridgeCameraCount } from '../config/version.js';
 
 const app = express();
 const port = appConfig.webPort;
+const providerMetas = listCameraProviders();
 
 app.set('view engine', 'ejs');
 app.set('views', join(PROJECT_ROOT, 'views'));
@@ -38,11 +39,32 @@ app.use(express.static(join(PROJECT_ROOT, 'public')));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+function getBridgeStatus() {
+    return bridge.isCommissioned() ? 'Commissioned' : 'Ready to Pair';
+}
+
+function resolveReturnToPath(raw: unknown): string {
+    const value = String(raw ?? '').trim();
+    if (value === '/options' || value === '/cameras/add') {
+        return value;
+    }
+
+    if (value.startsWith('/cameras/add/')) {
+        const providerId = value.slice('/cameras/add/'.length);
+        if (getCameraProvider(providerId)) {
+            return value;
+        }
+        return '/cameras/add';
+    }
+
+    return '/';
+}
+
 // Routes
 app.get('/', async (req, res) => {
     const cameras = storage.getCameras().map(sanitizeCameraForPublic);
     const pairingInfo = await bridge.getPairingInfo();
-    const bridgeStatus = bridge.isCommissioned() ? 'Commissioned' : 'Ready to Pair';
+    const bridgeStatus = getBridgeStatus();
     res.render('index', {
         cameras,
         pairingInfo,
@@ -53,11 +75,35 @@ app.get('/', async (req, res) => {
 });
 
 app.get('/options', (_req, res) => {
-    const bridgeStatus = bridge.isCommissioned() ? 'Commissioned' : 'Ready to Pair';
+    const bridgeStatus = getBridgeStatus();
     res.render('options', {
         bridgeStatus,
         appVersion,
         protectController: settings.getProtectControllerPublic(),
+    });
+});
+
+app.get('/cameras/add', (_req, res) => {
+    res.render('add-camera', {
+        bridgeStatus: getBridgeStatus(),
+        appVersion,
+        providers: providerMetas,
+    });
+});
+
+app.get('/cameras/add/:providerId', (req, res) => {
+    const provider = getCameraProvider(req.params.providerId);
+    if (!provider) {
+        res.redirect('/cameras/add');
+        return;
+    }
+
+    res.render('add-camera-provider', {
+        bridgeStatus: getBridgeStatus(),
+        appVersion,
+        selectedProvider: provider.meta,
+        protectController: settings.getProtectControllerPublic(),
+        isCommissioned: bridge.isCommissioned(),
     });
 });
 
@@ -349,7 +395,7 @@ app.post('/api/camera-providers/unifi-protect/sync-existing', async (req, res) =
 
 app.post('/api/restart', (req, res) => {
     scheduleBridgeRestart('manual restart from Web UI');
-    const returnTo = req.body.returnTo === '/options' ? '/options' : '/';
+    const returnTo = resolveReturnToPath(req.body.returnTo);
     res.redirect(returnTo);
 });
 
@@ -430,6 +476,7 @@ app.post('/api/cameras/:id/duplicate', async (req, res) => {
         reolinkChannel: existing.reolinkChannel,
         protectHost: existing.protectHost,
         protectCameraId: existing.protectCameraId,
+        addSource: existing.addSource,
     };
 
     await installCamera(config);
@@ -469,7 +516,7 @@ app.post('/api/reset', (_req, res) => {
   <h1>Resetting Matter pairing</h1>
   <p>Pairing data was cleared and the bridge is restarting. Your camera list is unchanged.</p>
   <p class="status" id="status">Waiting for the bridge to come back online…</p>
-  <p><a href="/">Open dashboard</a> if this page does not redirect automatically.</p>
+    <p><a href="/options">Open options</a> if this page does not redirect automatically.</p>
   <script>
     const status = document.getElementById('status');
     let attempts = 0;
@@ -480,7 +527,7 @@ app.post('/api/reset', (_req, res) => {
         if (r.ok) {
           clearInterval(poll);
           status.textContent = 'Bridge is back online. Redirecting…';
-          location.href = '/';
+          location.href = '/options';
         }
       } catch (_) {}
       if (attempts >= 45) {

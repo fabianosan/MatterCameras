@@ -1,0 +1,25 @@
+<section class="provider-config-section" data-provider-panel="onvif">
+    <div class="provider-config-section__header">
+        <div>
+            <p class="section-kicker">LAN discovery</p>
+            <h3>Scan for ONVIF cameras</h3>
+            <p class="field-hint">Enter the ONVIF login first, then scan this network for supported cameras.</p>
+        </div>
+    </div>
+
+    <div class="provider-creds provider-creds--panel">
+        <label for="onvif-scan-user">ONVIF username</label>
+        <input type="text" id="onvif-scan-user" placeholder="admin" autocomplete="username">
+
+        <label for="onvif-scan-pass">ONVIF password</label>
+        <input type="password" id="onvif-scan-pass" placeholder="password" autocomplete="current-password">
+    </div>
+
+    <div class="provider-actions">
+        <button type="button" class="btn btn-secondary btn-sm provider-discover-btn" data-provider="onvif">
+            Scan LAN (5s)
+        </button>
+    </div>
+
+    <p class="field-hint provider-inline-note">This works best when the bridge host and the camera are on the same subnet.</p>
+</section>

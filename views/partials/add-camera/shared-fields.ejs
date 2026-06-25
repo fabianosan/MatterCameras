@@ -1,0 +1,51 @@
+<% const isManual = selectedProvider.id === 'manual'; %>
+
+<section class="provider-config-section provider-config-section--details">
+    <div class="provider-config-section__header">
+        <div>
+            <p class="section-kicker">Camera details</p>
+            <h3>Name it and save</h3>
+            <p class="field-hint"><%= isManual ? 'Add a name and paste the stream URL.' : 'When the helper fills the camera, review the name and stream URL before saving.' %></p>
+        </div>
+    </div>
+
+    <div class="add-camera-details__grid">
+        <div>
+            <label for="add-name">Camera Name</label>
+            <input type="text" id="add-name" name="name" placeholder="Front Door" required>
+        </div>
+
+        <div class="add-camera-details__stream">
+            <label for="add-rtsp">Stream URL (RTSP / RTSPS)</label>
+            <input type="text" id="add-rtsp" name="rtspUrl" placeholder="Filled by helper or pasted manually" required>
+            <p id="add-rtsp-hint" class="field-hint"><%= isManual ? 'Paste the RTSP or RTSPS URL from your camera or NVR.' : 'The helper on the left can fill this for you automatically.' %></p>
+        </div>
+    </div>
+
+    <details class="advanced-toggle">
+        <summary>Advanced options</summary>
+        <div class="advanced-options">
+            <label for="add-codec">Video codec (optional)</label>
+            <select id="add-codec" name="codec">
+                <option value="">Auto Detect</option>
+                <option value="h264">H.264</option>
+                <option value="h265">H.265</option>
+            </select>
+
+            <%- include('../motion-options', {
+                idPrefix: 'add',
+                selectedMotion: 'auto',
+                addSource: selectedProvider.id,
+            }) %>
+        </div>
+    </details>
+
+    <div class="add-camera-submit-row">
+        <button type="submit" class="btn">Save Camera</button>
+        <% if (isCommissioned) { %>
+            <p class="field-hint add-camera-submit-hint">
+                After save, the bridge restarts automatically so SmartThings can see the new camera.
+            </p>
+        <% } %>
+    </div>
+</section>
