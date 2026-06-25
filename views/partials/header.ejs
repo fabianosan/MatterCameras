@@ -40,13 +40,7 @@
                     <% if (typeof activePage === 'undefined' || activePage !== 'options') { %>
                         <a href="/options" class="btn btn-ghost btn-sm">Options</a>
                     <% } %>
-                    <form action="/api/restart" method="POST" class="inline-form"
-                        onsubmit="return confirm('Restart the bridge? SmartThings may take ~30s to reconnect.');">
-                        <% if (typeof returnTo !== 'undefined' && returnTo) { %>
-                            <input type="hidden" name="returnTo" value="<%= returnTo %>">
-                        <% } %>
-                        <button type="submit" class="btn btn-ghost btn-sm">Restart Bridge</button>
-                    </form>
+                    <%- include('bridge-restart-form', { returnTo: typeof returnTo !== 'undefined' ? returnTo : '', bridgeRestartPending }) %>
                 </div>
             </div>
         </header>

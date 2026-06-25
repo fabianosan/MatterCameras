@@ -56,6 +56,25 @@ npm start          # TypeScript via tsx (set matterHost in data/config.json)
 npm run build      # compile to dist/
 ```
 
+Root workflow helpers:
+
+```bash
+./sync.sh
+./commit.sh "message" [--push]
+./quick-deploy.sh
+./deploy.sh
+```
+
+Windows PowerShell:
+
+```powershell
+./sync.ps1
+./commit.ps1 "message"
+./commit.ps1 "message" -Push
+./quick-deploy.ps1
+./deploy.ps1
+```
+
 Local Docker stack: `./scripts/setup.sh` then `docker compose logs -f app`.  
 App-only on host: `./scripts/setup.sh --dev` and `docker compose up -d go2rtc`.
 

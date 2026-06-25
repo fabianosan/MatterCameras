@@ -16,6 +16,14 @@ function initAddCameraPage() {
     const protectHostInput = document.getElementById('add-protect-host');
     const protectCamInput = document.getElementById('add-protect-cam');
     const reolinkChInput = document.getElementById('add-reolink-ch');
+    const reolinkHostInput = document.getElementById('add-reolink-host');
+    const reolinkHttpPortInput = document.getElementById('add-reolink-http-port');
+    const reolinkUseHttpsInput = document.getElementById('add-reolink-use-https');
+    const reolinkRtspPortInput = document.getElementById('add-reolink-rtsp-port');
+    const reolinkProtocolInput = document.getElementById('add-reolink-protocol');
+    const reolinkStreamInput = document.getElementById('add-reolink-stream');
+    const reolinkUidInput = document.getElementById('add-reolink-uid');
+    const reolinkIsNvrInput = document.getElementById('add-reolink-is-nvr');
     const providerId = form?.dataset.providerId || 'manual';
 
     if (!form) return;
@@ -82,6 +90,14 @@ function initAddCameraPage() {
         if (reolinkChInput && draft.reolinkChannel !== undefined) {
             reolinkChInput.value = String(draft.reolinkChannel);
         }
+        if (reolinkHostInput) reolinkHostInput.value = draft.reolinkHost || '';
+        if (reolinkHttpPortInput) reolinkHttpPortInput.value = draft.reolinkHttpPort ?? '';
+        if (reolinkUseHttpsInput) reolinkUseHttpsInput.value = draft.reolinkUseHttps === undefined ? '' : String(draft.reolinkUseHttps);
+        if (reolinkRtspPortInput) reolinkRtspPortInput.value = draft.reolinkRtspPort ?? '';
+        if (reolinkProtocolInput) reolinkProtocolInput.value = draft.reolinkProtocol || '';
+        if (reolinkStreamInput) reolinkStreamInput.value = draft.reolinkStream || '';
+        if (reolinkUidInput) reolinkUidInput.value = draft.reolinkDeviceUid || '';
+        if (reolinkIsNvrInput) reolinkIsNvrInput.value = draft.reolinkIsNvr === undefined ? '' : String(draft.reolinkIsNvr);
         if (motionSelect) {
             motionSelect.value = draft.suggestedMotionSource || 'auto';
             motionSelect.dispatchEvent(new Event('change'));

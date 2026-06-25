@@ -77,6 +77,14 @@ Optional `onvifUrl` (Tapo often port **2020**).
 
 - **Reolink:** `reolink-native` or auto when `manufacturer: Reolink`; optional `reolinkChannel`.
 - **UniFi:** `unifi-protect` or auto when `protectHost` + `protectCameraId` set.
+- Optional `motionObjectType: person` restricts the trigger to vendor person detection on those two native providers.
+- Optional `personSensorEnabled: true` adds a second bridged Matter endpoint dedicated to person events.
+
+Important: SmartThings still sees the same binary **Motion detected** / **OccupancySensing** signal. `motionObjectType: person` only changes which upstream Reolink / UniFi event is allowed to flip that signal.
+
+With `personSensorEnabled: true`, the bridge also exposes a separate Matter **Occupancy Sensor** endpoint for that camera, treated as **person presence** semantics. SmartThings Matter sensor handling can map `OccupancySensing` to automation-friendly sensor capabilities, which is the cleanest path to split camera motion from person-presence events without changing the camera device type itself.
+
+Optional `reolinkLightEnabled: true` (Reolink only) adds a third bridged Matter endpoint — an **On/Off Light** for the camera WhiteLed spotlight. The bridge probes `GetWhiteLed` at startup; cameras without spotlight hardware skip endpoint creation. SmartThings maps the endpoint to a switch for scenes and automations.
 
 **Architecture:** [MOTION-PROVIDERS.md](./MOTION-PROVIDERS.md).
 

@@ -2,6 +2,7 @@ import { OnvifMotionDetector } from '../../streaming/onvifMotionDetector.js';
 import { resolveOnvifTarget } from '../../streaming/resolveOnvifTarget.js';
 import type { Camera } from '../../types/index.js';
 import type { MotionCallbacks, MotionContext, MotionProvider, ProviderMatch } from '../types.js';
+import { wantsPersonMotion } from '../types.js';
 
 /** ONVIF WSPullPoint motion (MotionAlarm, CellMotionDetector, etc.). */
 export class OnvifMotionProvider implements MotionProvider {
@@ -13,6 +14,7 @@ export class OnvifMotionProvider implements MotionProvider {
     readonly #detectors = new Map<string, OnvifMotionDetector>();
 
     canHandle(camera: Camera): ProviderMatch | null {
+        if (wantsPersonMotion(camera)) return null;
         const target = resolveOnvifTarget(camera);
         if (!target) return null;
         return {

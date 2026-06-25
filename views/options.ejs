@@ -1,4 +1,4 @@
-<%- include('partials/header', { pageTitle: 'Options', bridgeStatus, appVersion, activePage: 'options' }) %>
+<%- include('partials/header', { pageTitle: 'Options', bridgeStatus, appVersion, activePage: 'options', bridgeRestartPending }) %>
 
     <div class="card options-page">
         <h2>SmartThings</h2>
@@ -40,13 +40,9 @@
     <div class="card options-page">
         <h2>Bridge</h2>
         <p class="field-hint" style="margin-top: 0;">
-            Restart reloads all cameras and refreshes the Matter parts list for SmartThings.
+            Restart reloads all cameras and refreshes the Matter parts list for SmartThings after roster changes.
         </p>
-        <form action="/api/restart" method="POST" class="inline-form"
-            onsubmit="return confirm('Restart the bridge? SmartThings may take ~30s to reconnect.');">
-            <input type="hidden" name="returnTo" value="/options">
-            <button type="submit" class="btn btn-ghost btn-sm">Restart Bridge</button>
-        </form>
+        <%- include('partials/bridge-restart-form', { returnTo: '/options', bridgeRestartPending }) %>
 
         <div class="danger-zone">
             <h3>Reset Pairing</h3>

@@ -8,6 +8,24 @@ Remote deployment to a dedicated bridge host (e.g. mini PC on the camera VLAN). 
 - Docker + Compose on the host
 - `rsync` and `ssh` on your workstation
 
+### Windows workstation
+
+If you deploy from Windows, install **Git for Windows** and use a shell that provides:
+
+- `bash`
+- `rsync`
+- `ssh`
+
+Preferred option: use the root **PowerShell** wrappers (`.ps1`).
+
+If PowerShell blocks local scripts, run once in that terminal:
+
+```powershell
+Set-ExecutionPolicy -Scope Process Bypass
+```
+
+Both the `.ps1` and `.cmd` wrappers forward to the existing bash deploy scripts.
+
 ## Configure deploy target
 
 Copy `deploy.env.example` → `deploy.env` (gitignored) and set your host:
@@ -33,6 +51,8 @@ Rebuilds images, syncs the full tree **and `dist/`** (required — see below). *
 npm run deploy
 # or
 ./scripts/deploy.sh
+# or
+./deploy.sh
 ```
 
 Use full deploy when adding or upgrading **npm dependencies** (e.g. `onvif`) — the Docker image runs `npm ci` at build time.
@@ -45,11 +65,48 @@ Bumps version, builds TypeScript, syncs `dist/`, `views/`, `public/`, `package.j
 npm run quick-deploy
 # or
 ./scripts/quick-deploy.sh
+# or
+./quick-deploy.sh
 ```
 
 Pass `--no-bump` to skip the version increment (e.g. when `npm run quick-deploy` already bumped).
 
 Both scripts end with **`docker compose restart app`** so `/api/version` reflects the bind-mounted `package.json` (read once at Node startup).
+
+## Root shortcuts
+
+The repository root also includes simple wrappers for convenience:
+
+```bash
+./sync.sh           # safe fetch + fast-forward-only pull when clean
+./deploy.sh         # forwards to scripts/deploy.sh
+./quick-deploy.sh   # forwards to scripts/quick-deploy.sh
+./commit.sh "message" [--push]
+```
+
+Windows equivalents:
+
+```bat
+sync.cmd
+deploy.cmd
+quick-deploy.cmd
+commit.cmd "message" [--push]
+```
+
+Preferred PowerShell equivalents:
+
+```powershell
+./sync.ps1
+./deploy.ps1
+./quick-deploy.ps1
+./commit.ps1 "message"
+./commit.ps1 "message" -Push
+```
+
+`commit.sh` stages all changes with `git add -A`, creates a commit, and optionally pushes the current branch when `--push` is supplied.
+`commit.cmd` does the same for Windows shells.
+`commit.ps1` does the same for PowerShell.
+`sync.*` is the safe “start working on this machine” helper: fetch, inspect branch state, and pull only when a fast-forward is safe.
 
 ## `dist/` bind-mount (important)
 

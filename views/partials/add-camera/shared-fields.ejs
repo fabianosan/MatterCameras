@@ -35,6 +35,9 @@
             <%- include('../motion-options', {
                 idPrefix: 'add',
                 selectedMotion: 'auto',
+                selectedMotionObjectType: 'any',
+                selectedPersonSensorEnabled: false,
+                selectedReolinkLightEnabled: false,
                 addSource: selectedProvider.id,
             }) %>
         </div>
@@ -44,7 +47,7 @@
         <button type="submit" class="btn">Save Camera</button>
         <% if (isCommissioned) { %>
             <p class="field-hint add-camera-submit-hint">
-                After save, the bridge restarts automatically so SmartThings can see the new camera.
+                After save, use Restart Required when you want to reload the bridge for SmartThings.
             </p>
         <% } %>
     </div>

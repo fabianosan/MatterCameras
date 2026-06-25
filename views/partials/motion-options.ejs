@@ -1,4 +1,7 @@
 <% const motionValue = typeof selectedMotion !== 'undefined' ? selectedMotion : 'auto'; %>
+<% const motionObjectTypeValue = typeof selectedMotionObjectType !== 'undefined' ? selectedMotionObjectType : 'any'; %>
+<% const personSensorEnabledValue = typeof selectedPersonSensorEnabled !== 'undefined' ? selectedPersonSensorEnabled : false; %>
+<% const reolinkLightEnabledValue = typeof selectedReolinkLightEnabled !== 'undefined' ? selectedReolinkLightEnabled : false; %>
 <% const motionAddSource = typeof addSource !== 'undefined' ? addSource : ''; %>
 <div class="motion-options-root" data-motion-root="<%= idPrefix %>" data-add-source="<%= motionAddSource %>">
     <label for="<%= idPrefix %>-motion">Motion detection</label>
@@ -31,12 +34,44 @@
         <p class="field-hint">Protect app → camera → copy id from URL or device settings.</p>
     </div>
 
+    <div class="motion-field-group" data-show-for="unifi-protect reolink-native auto">
+        <p class="motion-group-label">Trigger filter</p>
+        <label for="<%= idPrefix %>-motion-object-type">Trigger on</label>
+        <select id="<%= idPrefix %>-motion-object-type" name="motionObjectType">
+            <option value="any" <%= motionObjectTypeValue === 'any' ? 'selected' : '' %>>Any motion (current behavior)</option>
+            <option value="person" <%= motionObjectTypeValue === 'person' ? 'selected' : '' %>>Person presence only</option>
+        </select>
+        <p class="field-hint">
+            Reolink uses AI <code>people</code>. UniFi Protect uses smart person detection events.
+            Matter still reports the result as motion/occupancy on SmartThings.
+        </p>
+
+        <label for="<%= idPrefix %>-person-sensor-enabled">Expose separate person presence sensor</label>
+        <select id="<%= idPrefix %>-person-sensor-enabled" name="personSensorEnabled">
+            <option value="false" <%= !personSensorEnabledValue ? 'selected' : '' %>>No</option>
+            <option value="true" <%= personSensorEnabledValue ? 'selected' : '' %>>Yes</option>
+        </select>
+        <p class="field-hint">
+            Adds a second Matter occupancy device in SmartThings for person-presence events, separate from the camera tile.
+        </p>
+    </div>
+
     <div class="motion-field-group" data-show-for="reolink-native auto">
         <p class="motion-group-label">Reolink</p>
         <label for="<%= idPrefix %>-reolink-ch">Channel (NVR)</label>
         <input type="number" id="<%= idPrefix %>-reolink-ch" name="reolinkChannel" min="0" max="31"
             value="<%= typeof reolinkChannel !== 'undefined' && reolinkChannel !== null ? reolinkChannel : 0 %>">
         <p class="field-hint">Use 0 for standalone cameras. RTSP credentials above are used for api.cgi.</p>
+
+        <label for="<%= idPrefix %>-reolink-light-enabled">Expose separate light device</label>
+        <select id="<%= idPrefix %>-reolink-light-enabled" name="reolinkLightEnabled">
+            <option value="false" <%= !reolinkLightEnabledValue ? 'selected' : '' %>>No</option>
+            <option value="true" <%= reolinkLightEnabledValue ? 'selected' : '' %>>Yes</option>
+        </select>
+        <p class="field-hint">
+            Adds a Matter dimmable light in SmartThings for the Reolink WhiteLed (on/off and brightness) when
+            <code>GetWhiteLed</code> is supported. Requires a bridge restart after enabling.
+        </p>
     </div>
 
     <div class="motion-field-group" data-show-for="onvif auto">
@@ -52,5 +87,21 @@
         value="<%= typeof manufacturer !== 'undefined' ? manufacturer : '' %>">
     <input type="hidden" id="<%= idPrefix %>-model" name="model"
         value="<%= typeof model !== 'undefined' ? model : '' %>">
+    <input type="hidden" id="<%= idPrefix %>-reolink-host" name="reolinkHost"
+        value="<%= typeof reolinkHost !== 'undefined' ? reolinkHost : '' %>">
+    <input type="hidden" id="<%= idPrefix %>-reolink-http-port" name="reolinkHttpPort"
+        value="<%= typeof reolinkHttpPort !== 'undefined' && reolinkHttpPort !== null ? reolinkHttpPort : '' %>">
+    <input type="hidden" id="<%= idPrefix %>-reolink-use-https" name="reolinkUseHttps"
+        value="<%= typeof reolinkUseHttps !== 'undefined' ? String(reolinkUseHttps) : '' %>">
+    <input type="hidden" id="<%= idPrefix %>-reolink-rtsp-port" name="reolinkRtspPort"
+        value="<%= typeof reolinkRtspPort !== 'undefined' && reolinkRtspPort !== null ? reolinkRtspPort : '' %>">
+    <input type="hidden" id="<%= idPrefix %>-reolink-protocol" name="reolinkProtocol"
+        value="<%= typeof reolinkProtocol !== 'undefined' ? reolinkProtocol : '' %>">
+    <input type="hidden" id="<%= idPrefix %>-reolink-stream" name="reolinkStream"
+        value="<%= typeof reolinkStream !== 'undefined' ? reolinkStream : '' %>">
+    <input type="hidden" id="<%= idPrefix %>-reolink-uid" name="reolinkDeviceUid"
+        value="<%= typeof reolinkDeviceUid !== 'undefined' ? reolinkDeviceUid : '' %>">
+    <input type="hidden" id="<%= idPrefix %>-reolink-is-nvr" name="reolinkIsNvr"
+        value="<%= typeof reolinkIsNvr !== 'undefined' ? String(reolinkIsNvr) : '' %>">
     <p id="<%= idPrefix %>-motion-hint" class="field-hint motion-suggest-hint" data-show-for="auto onvif reolink-native unifi-protect"></p>
 </div>

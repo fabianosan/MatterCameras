@@ -1,4 +1,5 @@
 import type { MotionSource } from '../motion/types.js';
+import type { ReolinkProtocol, ReolinkStream } from '../types/index.js';
 
 /** How the camera was added via the Web UI wizard. */
 export type CameraAddSource = 'manual' | 'onvif' | 'unifi-protect' | 'reolink' | 'tapo-sonoff';
@@ -35,6 +36,14 @@ export interface ResolvedCameraDraft {
     password?: string;
     onvifUrl?: string;
     reolinkChannel?: number;
+    reolinkHost?: string;
+    reolinkHttpPort?: number;
+    reolinkUseHttps?: boolean;
+    reolinkRtspPort?: number;
+    reolinkProtocol?: ReolinkProtocol;
+    reolinkStream?: ReolinkStream;
+    reolinkDeviceUid?: string;
+    reolinkIsNvr?: boolean;
     protectHost?: string;
     protectCameraId?: string;
     suggestedMotionSource?: MotionSource;

@@ -8,12 +8,17 @@ import { streamContext } from '../matter/behaviors/streamContext.js';
 
 const logger = Logger.get('MotionService');
 
+interface MotionOverrideCallbacks {
+    onActive?: (active: boolean) => void;
+    onPulse?: () => void;
+}
+
 /** Starts/stops per-camera motion and forwards activity to Zone Management. */
 export class MotionDetectionService {
     readonly #registry = new MotionProviderRegistry();
     readonly #activeProvider = new Map<string, MotionProviderId>();
 
-    startCamera(camera: Camera, go2rtc: Go2RTCClient): void {
+    startCamera(camera: Camera, go2rtc: Go2RTCClient, overrideCallbacks?: MotionOverrideCallbacks): void {
         this.stopCamera(camera.id);
 
         const source = camera.motionSource ?? 'frame-diff';
@@ -37,8 +42,14 @@ export class MotionDetectionService {
         };
 
         const callbacks = {
-            onActive: (active: boolean) => streamContext.reportMotionActivity.get(camera.id)?.(active),
-            onPulse: () => streamContext.reportMotionPulse.get(camera.id)?.(),
+            onActive: (active: boolean) => {
+                overrideCallbacks?.onActive?.(active);
+                streamContext.reportMotionActivity.get(camera.id)?.(active);
+            },
+            onPulse: () => {
+                overrideCallbacks?.onPulse?.();
+                streamContext.reportMotionPulse.get(camera.id)?.();
+            },
         };
 
         void this.#registry.startCamera(camera, ctx, callbacks, (providerId, error) => {

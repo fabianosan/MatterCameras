@@ -5,6 +5,7 @@ import { Logger } from '@matter/general';
 import { normalizeJpeg, readJpegDimensions } from '../../streaming/normalizeJpeg.js';
 import { imageTransformFromMatterState } from '../../streaming/imageTransform.js';
 import { streamContext } from './streamContext.js';
+import { logHubEndpointAdoption } from '../hubAdoptionLog.js';
 import {
     createDefaultAudioStream,
     createDefaultSnapshotStream,
@@ -146,6 +147,7 @@ export class MatterCameraAvStreamManagementServer extends CameraAvServer {
         if (!go2rtc) throw new Error('go2rtc client not initialized');
 
         const cameraId = String(this.endpoint.id);
+        logHubEndpointAdoption(cameraId, 'captureSnapshot');
         let maxWidth = clampSnapshotWidth(request.requestedResolution?.width);
         let maxHeight: number | undefined;
 

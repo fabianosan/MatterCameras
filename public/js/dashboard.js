@@ -196,9 +196,92 @@ function escapeHtml(text) {
         .replace(/"/g, '&quot;');
 }
 
+function pairingQrImageUrl(qrPayload) {
+    return `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(qrPayload)}&t=${Date.now()}`;
+}
+
+function updatePairingUi(data) {
+    const content = document.getElementById('pairing-content');
+    const status = document.getElementById('pairing-refresh-status');
+    if (!content) return;
+
+    if (data.commissioned || !data.qrCode) {
+        return;
+    }
+
+    content.innerHTML = `
+        <img id="pairing-qr-img" src="${pairingQrImageUrl(data.qrCode)}" alt="Matter Pairing QR">
+        <div style="margin-top: 16px;">
+            <small style="color: var(--text-secondary);">Manual code (SmartThings → Matter → Enter code)</small>
+            <span id="pairing-manual-code" class="pairing-code">${escapeHtml(data.manualPairingCode)}</span>
+        </div>
+        <details class="technical-details">
+            <summary>Show technical details</summary>
+            <pre id="pairing-qr-payload">${escapeHtml(data.qrCode)}</pre>
+        </details>`;
+
+    if (status) {
+        status.hidden = false;
+        status.textContent = 'Pairing code updated. Scan the new QR or enter the new manual code in SmartThings.';
+    }
+}
+
+async function fetchPairingInfo(refresh = false) {
+    const url = refresh ? '/api/pairing/refresh' : '/api/pairing';
+    const res = await fetch(url, refresh ? { method: 'POST' } : { cache: 'no-store' });
+    if (!res.ok && refresh) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || `HTTP ${res.status}`);
+    }
+    return res.json();
+}
+
+function initPairingPanel() {
+    const refreshBtn = document.getElementById('refresh-pairing-btn');
+    const reloadBtn = document.getElementById('reload-pairing-btn');
+    const waiting = document.getElementById('pairing-waiting');
+    if (!refreshBtn && !reloadBtn && !waiting) return;
+
+    const load = async (refresh = false) => {
+        const status = document.getElementById('pairing-refresh-status');
+        if (refreshBtn) refreshBtn.disabled = true;
+        if (reloadBtn) reloadBtn.disabled = true;
+        try {
+            const data = await fetchPairingInfo(refresh);
+            updatePairingUi(data);
+        } catch (error) {
+            if (status) {
+                status.hidden = false;
+                status.textContent = String(error);
+            }
+        } finally {
+            if (refreshBtn) refreshBtn.disabled = false;
+            if (reloadBtn) reloadBtn.disabled = false;
+        }
+    };
+
+    refreshBtn?.addEventListener('click', () => void load(true));
+    reloadBtn?.addEventListener('click', () => void load(false));
+
+    if (waiting) {
+        const poll = setInterval(async () => {
+            try {
+                const data = await fetchPairingInfo(false);
+                if (data.qrCode) {
+                    clearInterval(poll);
+                    updatePairingUi(data);
+                }
+            } catch {
+                // keep polling until bridge is up
+            }
+        }, 2000);
+    }
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     window.MatterCamerasMotionOptions?.initMotionOptions();
     initCameraCards();
     initCameraPreviews();
     initLogs();
+    initPairingPanel();
 });

@@ -2,6 +2,7 @@ import { Logger } from '@matter/general';
 import { ProtectApi } from 'unifi-protect';
 import { motionConfig } from '../../../config/motion.js';
 import { OnvifMotionDebouncer } from '../../../onvif/motionDebounce.js';
+import type { MotionObjectType } from '../../types.js';
 import type { ProtectTarget } from './protectTarget.js';
 
 const logger = Logger.get('ProtectHub');
@@ -9,6 +10,7 @@ const logger = Logger.get('ProtectHub');
 type ProtectHandler = {
     matterCameraId: string;
     protectCameraId: string;
+    motionObjectType: MotionObjectType;
     debouncer: OnvifMotionDebouncer;
 };
 
@@ -24,6 +26,7 @@ const controllers = new Map<string, ControllerState>();
 export async function attachProtectMotion(
     matterCameraId: string,
     target: ProtectTarget,
+    motionObjectType: MotionObjectType,
     onActive: (active: boolean) => void,
     onPulse: () => void,
 ): Promise<void> {
@@ -63,13 +66,22 @@ export async function attachProtectMotion(
         })();
     }
 
+    await state.ready;
+
+    if (motionObjectType === 'person') {
+        const camera = state.api.bootstrap?.cameras.find(row => row.id === target.cameraId);
+        if (!protectCameraSupportsPersonDetection(camera)) {
+            throw new Error('UniFi Protect person detection unavailable for this camera');
+        }
+    }
+
     state.handlers.set(matterCameraId, {
         matterCameraId,
         protectCameraId: target.cameraId,
+        motionObjectType,
         debouncer: new OnvifMotionDebouncer(motionConfig.unifiHoldMs, onActive, onPulse),
     });
 
-    await state.ready;
     logger.info(
         `UniFi Protect motion watching camera=${matterCameraId} protectId=${target.cameraId} controller=${key}`,
     );
@@ -105,17 +117,70 @@ interface ProtectPacket {
     payload?: Record<string, unknown>;
 }
 
+function normalizeProtectTypes(raw: unknown): string[] {
+    return Array.isArray(raw)
+        ? raw.map(value => String(value).trim().toLowerCase()).filter(Boolean)
+        : [];
+}
+
+export function protectCameraSupportsPersonDetection(camera: Record<string, unknown> | undefined): boolean {
+    if (!camera || typeof camera !== 'object') return false;
+
+    const featureFlags = camera.featureFlags;
+    if (!featureFlags || typeof featureFlags !== 'object') return false;
+    if ((featureFlags as { hasSmartDetect?: unknown }).hasSmartDetect !== true) return false;
+
+    const supportedTypes = new Set<string>([
+        ...normalizeProtectTypes((featureFlags as { smartDetectTypes?: unknown }).smartDetectTypes),
+        ...normalizeProtectTypes(
+            (camera.extendedAiFeatures as { smartDetectTypes?: unknown } | undefined)?.smartDetectTypes,
+        ),
+    ]);
+
+    return supportedTypes.size === 0 || supportedTypes.has('person');
+}
+
+export function protectPacketMatchesPersonDetection(packet: ProtectPacket, protectCameraId: string): boolean {
+    const header = packet.header;
+    const payload = packet.payload;
+    if (!header || !payload) return false;
+    if (header.modelKey !== 'event' || header.action !== 'add') return false;
+
+    const cameraId = String(payload.camera ?? payload.cameraId ?? '');
+    if (!cameraId || cameraId !== protectCameraId) return false;
+
+    const type = String(payload.type ?? '');
+    if (!type.startsWith('smartDetect')) return false;
+
+    return normalizeProtectTypes(payload.smartDetectTypes).includes('person');
+}
+
+export function protectCameraUpdateMatchesPersonDetection(payload: Record<string, unknown>): boolean {
+    return payload.isSmartDetected === true && normalizeProtectTypes(payload.smartDetectTypes).includes('person');
+}
+
 function routePacket(handlers: Map<string, ProtectHandler>, packet: ProtectPacket): void {
     const header = packet.header;
     const payload = packet.payload;
     if (!header || !payload) return;
 
     if (header.modelKey === 'event' && header.action === 'add') {
-        const cameraId = String(payload.camera ?? '');
+        const cameraId = String(payload.camera ?? payload.cameraId ?? '');
         const type = String(payload.type ?? '');
-        if (type === 'motion' && cameraId) {
+        if (cameraId) {
             for (const handler of handlers.values()) {
                 if (handler.protectCameraId !== cameraId) continue;
+
+                if (handler.motionObjectType === 'person') {
+                    if (!protectPacketMatchesPersonDetection(packet, cameraId)) continue;
+                    handler.debouncer.pulse();
+                    logger.info(
+                        `UniFi Protect motion camera=${handler.matterCameraId} event=${type} object=person`,
+                    );
+                    continue;
+                }
+
+                if (type !== 'motion') continue;
                 handler.debouncer.pulse();
                 logger.info(`UniFi Protect motion camera=${handler.matterCameraId} event=motion`);
             }
@@ -125,10 +190,21 @@ function routePacket(handlers: Map<string, ProtectHandler>, packet: ProtectPacke
 
     if (header.modelKey === 'camera' && header.action === 'update') {
         const cameraId = String(header.id ?? '');
-        const isMotion = payload.isMotionDetected === true;
-        if (!isMotion || !cameraId) return;
+        if (!cameraId) return;
         for (const handler of handlers.values()) {
             if (handler.protectCameraId !== cameraId) continue;
+
+            if (handler.motionObjectType === 'person') {
+                if (!protectCameraUpdateMatchesPersonDetection(payload)) continue;
+                handler.debouncer.pulse();
+                logger.info(
+                    `UniFi Protect motion camera=${handler.matterCameraId} state=isSmartDetected object=person`,
+                );
+                continue;
+            }
+
+            const isMotion = payload.isMotionDetected === true;
+            if (!isMotion) continue;
             handler.debouncer.pulse();
             logger.info(`UniFi Protect motion camera=${handler.matterCameraId} state=isMotionDetected`);
         }

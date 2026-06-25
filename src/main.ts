@@ -5,8 +5,90 @@ import { settings } from './storage/settings.js';
 import { bridge } from './matter/Bridge.js';
 import { startWebServer } from './web/server.js';
 import { appConfig } from './config/app.js';
-import { setBridgeCameraCount, appVersion } from './config/version.js';
+import { setBridgeEndpointCount, appVersion } from './config/version.js';
 import { streamContext } from './matter/behaviors/streamContext.js';
+import { getMatterStoragePath, wipeMatterStorage } from './matter/matterStorage.js';
+import { countBridgedEndpoints, expectedBridgedEndpointIds } from './matter/personSensorConfig.js';
+
+let staleRecoveryInProgress = false;
+
+function hasStaleFabricReference(error: unknown, visited = new Set<unknown>()): boolean {
+    if (error === null || typeof error !== 'object' || visited.has(error)) {
+        return false;
+    }
+    visited.add(error);
+
+    const candidate = error as {
+        message?: unknown;
+        name?: unknown;
+        code?: unknown;
+        cause?: unknown;
+        errors?: unknown;
+    };
+
+    const parts = [candidate.name, candidate.code, candidate.message]
+        .filter(v => typeof v === 'string')
+        .map(v => String(v).toLowerCase())
+        .join(' ');
+
+    if (parts.includes('fabric-not-found')
+        || parts.includes('fabricnotfound')
+        || (parts.includes('fabric index') && parts.includes('does not exist'))
+    ) {
+        return true;
+    }
+
+    if (Array.isArray(candidate.errors)) {
+        for (const nested of candidate.errors) {
+            if (hasStaleFabricReference(nested, visited)) {
+                return true;
+            }
+        }
+    }
+
+    return hasStaleFabricReference(candidate.cause, visited);
+}
+
+async function recoverFromStaleFabricIfNeeded(error: unknown, source: string): Promise<boolean> {
+    if (!hasStaleFabricReference(error)) {
+        return false;
+    }
+    if (staleRecoveryInProgress) {
+        return true;
+    }
+
+    staleRecoveryInProgress = true;
+    const storagePath = getMatterStoragePath();
+    console.error(
+        `[${source}] Detected stale Matter fabric references (likely after bridge removal). `
+        + 'Clearing Matter storage to return to pairing mode...',
+    );
+    await wipeMatterStorage();
+    console.error(`Matter storage cleared at ${storagePath}. Restarting process...`);
+    process.exit(0);
+}
+
+function installStaleFabricRecoveryHooks() {
+    process.on('uncaughtException', error => {
+        void (async () => {
+            if (await recoverFromStaleFabricIfNeeded(error, 'uncaughtException')) {
+                return;
+            }
+            console.error('Fatal uncaught exception:', error);
+            process.exit(1);
+        })();
+    });
+
+    process.on('unhandledRejection', reason => {
+        void (async () => {
+            if (await recoverFromStaleFabricIfNeeded(reason, 'unhandledRejection')) {
+                return;
+            }
+            console.error('Fatal unhandled rejection:', reason);
+            process.exit(1);
+        })();
+    });
+}
 
 async function main() {
     console.log(`Starting MatterCameras v${appVersion}...`);
@@ -16,15 +98,23 @@ async function main() {
 
     await storage.init();
     await settings.init();
+    await settings.clearBridgeRestartPending();
 
-    await bridge.init();
+    try {
+        await bridge.init();
+    } catch (error) {
+        if (await recoverFromStaleFabricIfNeeded(error, 'bridge.init')) {
+            return;
+        }
+        throw error;
+    }
     startWebServer();
     streamContext.refreshMotionSensitivity = id => bridge.motionDetection.applySensitivity(id);
     await bridge.go2rtc.waitUntilReady();
 
     const cameras = storage.getCameras();
-    setBridgeCameraCount(cameras.length);
-    const knownIds = new Set(cameras.map(c => c.id));
+    setBridgeEndpointCount(countBridgedEndpoints(cameras));
+    const knownIds = expectedBridgedEndpointIds(cameras);
     const orphans = bridge.listOrphanBridgedCameraIds(knownIds);
     if (orphans.length > 0) {
         console.warn(
@@ -42,7 +132,14 @@ async function main() {
     await bridge.go2rtc.prewarmAllWebRtc();
 
     // Start Matter only after cameras are on the aggregator (avoids hub seeing empty partsList).
-    await bridge.start();
+    try {
+        await bridge.start();
+    } catch (error) {
+        if (await recoverFromStaleFabricIfNeeded(error, 'bridge.start')) {
+            return;
+        }
+        throw error;
+    }
 
     // Motion polls go2rtc JPEG frames — must run only after every stream is registered.
     for (const cam of cameras) {
@@ -53,7 +150,14 @@ async function main() {
     bridge.go2rtc.startPeriodicPrune();
 }
 
+installStaleFabricRecoveryHooks();
+
 main().catch(err => {
-    console.error('Fatal Error:', err);
-    process.exit(1);
+    void (async () => {
+        if (await recoverFromStaleFabricIfNeeded(err, 'main.catch')) {
+            return;
+        }
+        console.error('Fatal Error:', err);
+        process.exit(1);
+    })();
 });

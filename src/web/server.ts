@@ -24,8 +24,11 @@ import {
 } from '../cameraProviders/unifi/protectApi.js';
 import { patchCameraFromProtect, syncExistingProtectCameras } from '../cameraProviders/unifi/syncExisting.js';
 import { installCamera, refreshCameraRuntime } from './cameraInstall.js';
+import { markBridgeRestartRequired } from './bridgeRestartState.js';
+import { bridgeRestartingPageHtml } from './bridgeRestartingPage.js';
 import { parseCameraMotionFields, parseMotionSource } from '../motion/parseMotionForm.js';
-import { setBridgeCameraCount } from '../config/version.js';
+import { setBridgeEndpointCount } from '../config/version.js';
+import { countBridgedEndpoints } from '../matter/personSensorConfig.js';
 
 const app = express();
 const port = appConfig.webPort;
@@ -42,6 +45,15 @@ app.use(express.urlencoded({ extended: true }));
 
 function getBridgeStatus() {
     return bridge.isCommissioned() ? 'Commissioned' : 'Ready to Pair';
+}
+
+function commonViewData() {
+    return {
+        bridgeStatus: getBridgeStatus(),
+        appVersion,
+        bridgeRestartPending: settings.isBridgeRestartPending(),
+        protectController: settings.getProtectControllerPublic(),
+    };
 }
 
 function resolveReturnToPath(raw: unknown): string {
@@ -67,27 +79,19 @@ app.get('/', async (req, res) => {
     const pairingInfo = await bridge.getPairingInfo();
     const bridgeStatus = getBridgeStatus();
     res.render('index', {
+        ...commonViewData(),
         cameras,
         pairingInfo,
-        bridgeStatus,
-        appVersion,
-        protectController: settings.getProtectControllerPublic(),
     });
 });
 
 app.get('/options', (_req, res) => {
-    const bridgeStatus = getBridgeStatus();
-    res.render('options', {
-        bridgeStatus,
-        appVersion,
-        protectController: settings.getProtectControllerPublic(),
-    });
+    res.render('options', commonViewData());
 });
 
 app.get('/cameras/add', (_req, res) => {
     res.render('add-camera', {
-        bridgeStatus: getBridgeStatus(),
-        appVersion,
+        ...commonViewData(),
         providers: providerMetas,
     });
 });
@@ -100,10 +104,8 @@ app.get('/cameras/add/:providerId', (req, res) => {
     }
 
     res.render('add-camera-provider', {
-        bridgeStatus: getBridgeStatus(),
-        appVersion,
+        ...commonViewData(),
         selectedProvider: provider.meta,
-        protectController: settings.getProtectControllerPublic(),
         isCommissioned: bridge.isCommissioned(),
     });
 });
@@ -143,6 +145,32 @@ app.delete('/api/settings/protect-controller', async (_req, res) => {
 /** Deploy verification — compare with local package.json after quick-deploy. */
 app.get('/api/version', (_req, res) => {
     res.json({ version: appVersion });
+});
+
+app.get('/api/pairing', async (_req, res) => {
+    const pairingInfo = await bridge.getPairingInfo();
+    res.json({
+        ...pairingInfo,
+        commissioned: bridge.isCommissioned(),
+    });
+});
+
+app.post('/api/pairing/refresh', async (_req, res) => {
+    if (bridge.isCommissioned()) {
+        res.status(409).json({
+            error: 'Bridge is already paired',
+            commissioned: true,
+            qrCode: '',
+            manualPairingCode: '',
+        });
+        return;
+    }
+
+    const pairingInfo = await bridge.refreshPairingCodes();
+    res.json({
+        ...pairingInfo,
+        commissioned: false,
+    });
 });
 
 /** Dashboard preview — JPEG snapshot from go2rtc (same path as SmartThings CaptureSnapshot). */
@@ -336,10 +364,6 @@ app.post('/api/camera-providers/unifi-protect/import', async (req, res) => {
             logoutProtect(api);
         }
 
-        if (added.length > 0 && bridge.isCommissioned()) {
-            scheduleBridgeRestart(`UniFi import: ${added.length} camera(s)`);
-        }
-
         res.json({ added, errors, count: added.length });
     } catch (error) {
         res.status(500).json({ error: String(error) });
@@ -411,9 +435,11 @@ app.post('/api/camera-providers/unifi-protect/sync-existing', async (req, res) =
 });
 
 app.post('/api/restart', (req, res) => {
-    scheduleBridgeRestart('manual restart from Web UI');
     const returnTo = resolveReturnToPath(req.body.returnTo);
-    res.redirect(returnTo);
+    res.status(202).type('html').send(bridgeRestartingPageHtml(returnTo));
+    setImmediate(() => {
+        scheduleBridgeRestart('manual restart from Web UI');
+    });
 });
 
 app.post('/api/cameras', async (req, res) => {
@@ -427,10 +453,6 @@ app.post('/api/cameras', async (req, res) => {
     };
 
     await installCamera(config);
-
-    if (bridge.isCommissioned()) {
-        scheduleBridgeRestart(`camera added: ${config.name}`);
-    }
 
     res.redirect('/');
 });
@@ -485,12 +507,23 @@ app.post('/api/cameras/:id/duplicate', async (req, res) => {
         rtspUrl: existing.rtspUrl,
         codec: existing.codec,
         motionSource: existing.motionSource ?? 'frame-diff',
+        motionObjectType: existing.motionObjectType ?? 'any',
+        personSensorEnabled: existing.personSensorEnabled ?? false,
+        reolinkLightEnabled: existing.reolinkLightEnabled ?? false,
         onvifUrl: existing.onvifUrl,
         username: existing.username,
         password: existing.password,
         manufacturer: existing.manufacturer,
         model: existing.model,
         reolinkChannel: existing.reolinkChannel,
+        reolinkHost: existing.reolinkHost,
+        reolinkHttpPort: existing.reolinkHttpPort,
+        reolinkUseHttps: existing.reolinkUseHttps,
+        reolinkRtspPort: existing.reolinkRtspPort,
+        reolinkProtocol: existing.reolinkProtocol,
+        reolinkStream: existing.reolinkStream,
+        reolinkDeviceUid: existing.reolinkDeviceUid,
+        reolinkIsNvr: existing.reolinkIsNvr,
         protectHost: existing.protectHost,
         protectCameraId: existing.protectCameraId,
         addSource: existing.addSource,
@@ -498,19 +531,16 @@ app.post('/api/cameras/:id/duplicate', async (req, res) => {
 
     await installCamera(config);
 
-    if (bridge.isCommissioned()) {
-        scheduleBridgeRestart(`camera duplicated: ${config.name}`);
-    }
-
     res.redirect('/');
 });
 
 app.post('/api/cameras/:id/delete', async (req, res) => {
     const { id } = req.params;
     await storage.removeCamera(id);
-    setBridgeCameraCount(storage.getCameras().length);
+    setBridgeEndpointCount(countBridgedEndpoints(storage.getCameras()));
     await bridge.removeCamera(id);
     await bridge.go2rtc.removeStream(id);
+    await markBridgeRestartRequired();
 
     res.redirect('/');
 });

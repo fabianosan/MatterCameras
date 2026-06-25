@@ -10,4 +10,6 @@ export const motionConfig = {
     reolinkHoldMs: Number(process.env.MOTION_REOLINK_HOLD_MS ?? 20_000),
     /** UniFi Protect motion hold (ms). */
     unifiHoldMs: Number(process.env.MOTION_UNIFI_HOLD_MS ?? 25_000),
+    /** Reolink WhiteLed state poll interval for bridged spotlight endpoints (ms). */
+    reolinkLightPollMs: Number(process.env.MOTION_REOLINK_LIGHT_POLL_MS ?? 5_000),
 };

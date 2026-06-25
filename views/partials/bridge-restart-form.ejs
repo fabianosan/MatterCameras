@@ -1,0 +1,11 @@
+<form action="/api/restart" method="POST" class="inline-form restart-bridge-form"
+    onsubmit="return confirm('Restart the bridge? SmartThings may take ~30s to reconnect.');">
+    <% if (typeof returnTo !== 'undefined' && returnTo) { %>
+        <input type="hidden" name="returnTo" value="<%= returnTo %>">
+    <% } %>
+    <% const restartPending = typeof bridgeRestartPending !== 'undefined' && bridgeRestartPending; %>
+    <button type="submit"
+        class="btn btn-sm <%= restartPending ? 'btn-restart-required' : 'btn-ghost' %>">
+        <%= restartPending ? 'Restart Required' : 'Restart Bridge' %>
+    </button>
+</form>

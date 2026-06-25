@@ -62,6 +62,14 @@ See [docs/SCALING.md](docs/SCALING.md) for hardware recommendations, camera coun
 ## [Unreleased]
 
 ### Added
+- **Separate bridged Reolink light** — Reolink cameras with WhiteLed support can expose an extra Matter **Dimmable Light** endpoint (`light-{cameraId}`) with on/off and brightness via `SetWhiteLed` / `GetWhiteLed` (maps to SmartThings `switch` + `switchLevel`).
+- Git sync helpers for switching machines safely: `sync.sh`, `sync.ps1`, and `sync.cmd`.
+- **Separate bridged person sensor** — supported Reolink and UniFi cameras can now expose an extra Matter endpoint dedicated to person-only events, in addition to the camera endpoint itself.
+- **Person-only vendor motion trigger** — per-camera **Trigger on → Person only** for **Reolink native** and **UniFi Protect**. Reolink now filters on AI `people`; UniFi filters on Protect smart detection person events. Unsupported fallbacks (ONVIF / frame-diff) no longer silently downgrade a `person` request back to generic motion.
+- Windows PowerShell helper scripts: `deploy.ps1`, `quick-deploy.ps1`, and `commit.ps1`.
+- Windows root helper scripts: `deploy.cmd`, `quick-deploy.cmd`, and `commit.cmd`.
+- Root helper scripts: `./deploy.sh`, `./quick-deploy.sh`, and `./commit.sh` for faster operator workflows from the repository root.
+- **Permanent hub-adoption logs** — first `CaptureSnapshot`, `ProvideOffer`, ICE trickle, or session end on a bridged camera now emits `Hub adopted bridged camera=...` so operators can distinguish “bridge created the endpoint” from “SmartThings actually used it”.
 - **Camera add providers (phase 2)** — saved **UniFi Protect controller** login in `data/settings.json` (Options + “Remember” checkbox); **Import all new** and **Link existing cameras** (match by name / RTSP alias); **Tapo / Sonoff** plugin (ONVIF direct on port 2020).
 - **Camera add providers** — plugin-style add flow in the Web UI: tabs for **UniFi Protect**, **Reolink**, **ONVIF**, and **Manual RTSP**. `GET /api/camera-providers`, `POST …/discover`, `POST …/resolve`. UniFi lists adopted cameras from the controller and fills `rtsps://…:7441/{alias}` + `protectHost` / `protectCameraId` automatically. Docs: `docs/CAMERA-PROVIDERS.md`. — ONVIF hardening: namespace strip, 30s hold debounce (`OnvifMotionDebouncer`), expanded topic markers (Reolink AI, Visitor, Tapo CellMotion), `suggestMotionProvider` on `/api/onvif/resolve`, Web UI **Auto** motion mode (`views/partials/motion-options.ejs`).
 - **Motion providers phase 3a** — `ReolinkMotionProvider` via native `api.cgi` (`GetMdState` + `GetAiState`); auto-select when `manufacturer` is Reolink.
@@ -78,7 +86,7 @@ See [docs/SCALING.md](docs/SCALING.md) for hardware recommendations, camera coun
 - `docs/INSTALL.md` — step-by-step tester guide (pairing, cameras, troubleshooting).
 - `docs/DEPLOY.md` — production rsync deploy (moved out of README).
 - `data/config.json.example` and `data/go2rtc.yaml.example` — host-agnostic templates for new installs.
-- Web UI **Options** panel and **Restart Bridge** button.
+- Web UI **Options** panel and bridge restart action.
 - Matter 1.5 **Zone Management** (`0x0550`) with full-viewport motion zone and `ZoneTriggered` / `ZoneStopped` events for SmartThings routines.
 - **OccupancySensing** cluster on bridged cameras for SmartThings routine picker (`motionSensor` capability after hub reprofile).
 - Generic **RTSP motion detection** via go2rtc JPEG frame comparison (`MotionDetectionService`); no vendor-specific APIs.
@@ -93,12 +101,18 @@ See [docs/SCALING.md](docs/SCALING.md) for hardware recommendations, camera coun
 - **ImageControl (flip / rotation):** SmartThings `imageFlipHorizontal`, `imageFlipVertical`, and `imageRotation` rebuild go2rtc ffmpeg sources for live view, snapshots, and motion; identity defaults keep raw-RTSP snapshots (see `.cursor/rules/image-control.mdc`).
 
 ### Changed
+- **Reolink add flow** — newly added Reolink cameras now default to the **sub-stream** RTSP URL (`Preview_XX_sub` / `h264Preview_XX_sub`) for faster SmartThings live view (native H.264, no main-stream H.265 transcode).
+- Web UI restart button now shows **Restart Bridge** normally and **Restart Required** (light red) after camera roster changes; clicking restart shows a waiting page and polls until the bridge is back online.
+- Person-only signaling wording now uses **presence semantics** in the Web UI and bridged endpoint labels (no storage/schema break; existing `personSensorEnabled` remains supported for compatibility).
+- Adding cameras no longer restarts the bridge automatically; the Web UI now labels the action as **Restart Required** so roster reload is explicit.
+- **Reolink add flow hardening** — discovery now uses `GetDevInfo`, `GetNetPort`, `GetChannelstatus`, `GetChnTypeInfo`, `GetEnc`, and `GetRtspUrl` instead of a fixed `:554/h264Preview_XX_main` assumption; direct dual-lens cameras stay as a single addable device, while NVR / Home Hub discovery prefers active channels with UID-based dedupe.
+- `cameras.json` now persists additional Reolink connection metadata (`reolinkHost`, `reolinkHttpPort`, `reolinkUseHttps`, `reolinkRtspPort`, `reolinkProtocol`, `reolinkStream`, `reolinkDeviceUid`, `reolinkIsNvr`) so native motion no longer depends solely on parsing RTSP URLs.
 - Web UI motion defaults to **`auto`** for new cameras; ONVIF scan suggests provider from manufacturer/model.
 - Web UI motion form shows **only relevant fields** per motion source (UniFi / Reolink / ONVIF / frame diff).
 - `cameras.json` supports `manufacturer`, `model`, `reolinkChannel`, `protectHost`, `protectCameraId`.
 - ONVIF motion uses **30s hold debounce** (improves Tapo/Sonoff CellMotion reliability).
 - **Reverted endpoint slot pool** — pre-registered `cam-slot-XX` placeholders caused dozens of useless camera devices in SmartThings; bridge now exposes only real cameras and purges legacy slots on startup.
-- Adding a camera while paired triggers an automatic bridge restart (best effort for hub resync).
+- Adding a camera while paired keeps the bridge online; use **Restart Required** manually when a bridge reload is desired.
 - `quick-deploy.sh` and `deploy.sh` always run `docker compose restart app` so `/api/version` matches synced `package.json`.
 - `deploy.sh` now rsyncs `dist/` to the host (required with `./dist` bind-mount in `docker-compose.yml`).
 - **Privacy / deploy safety** — removed committed `data/config.json` and `data/go2rtc.yaml`; gitignore runtime config; deploy scripts never rsync `cameras.json`, `config.json`, `go2rtc.yaml`, or `matter-storage/`.
@@ -108,6 +122,8 @@ See [docs/SCALING.md](docs/SCALING.md) for hardware recommendations, camera coun
 - Motion detection: less sensitive frame-diff (hysteresis, debounce, changed-pixel ratio) and default zone sensitivity 3; reduces false triggers on outdoor cameras.
 
 ### Fixed
+- Web UI **New pairing code** now rotates the Matter commissioning discriminator and updates the QR/manual code (previously **Refresh QR** only reloaded the page with the same fixed codes).
+- Startup crash loop after removing the last SmartThings bridge: when Matter startup detects stale fabric references (e.g., `Fabric index ... does not exist` / `fabric-not-found`), the app now clears only Matter storage and exits cleanly so Docker restarts in **Ready to Pair** mode automatically.
 - **UniFi Protect bulk import stability** — `POST /api/camera-providers/unifi-protect/import` now reuses a single Protect login/bootstrap for the whole batch instead of logging in once per camera; production imports had been stopping after only a few cameras when repeated controller logins began failing.
 - **Camera roster persistence** — `StorageService` now clones returned camera objects and reloads lowdb before each write, preventing stale in-memory state from overwriting `data/cameras.json` with a partial roster during production imports.
 - **ONVIF motion PullPoint** — pass `path` and `preserveAddress` from `onvifUrl`; connect before subscribing; share one PullPoint per NVR endpoint (fixes `SOAP-ENV:Sender` when multiple cameras use the same host); broaden motion topic parsing.

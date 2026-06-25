@@ -1,5 +1,6 @@
 import type { Camera } from '../types/index.js';
 import { resolveOnvifCamera } from '../onvif/connectCamera.js';
+import { streamSourceHostname } from '../utils/streamSourceUrl.js';
 import type { CameraAddProvider, DiscoveredCameraDevice } from './types.js';
 
 const DEFAULT_PORT = 2020;
@@ -19,11 +20,7 @@ function isDirectOnvifAdded(cameras: Camera[], hostname: string, port: number): 
                 // ignore
             }
         }
-        try {
-            if (new URL(cam.rtspUrl).hostname.toLowerCase() === hostKey) return true;
-        } catch {
-            // ignore
-        }
+        if (streamSourceHostname(cam.rtspUrl) === hostKey) return true;
     }
     return false;
 }

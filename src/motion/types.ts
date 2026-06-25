@@ -8,6 +8,21 @@ export type MotionProviderId =
 /** Per-camera motion backend selection (Web UI / cameras.json). */
 export type MotionSource = 'auto' | MotionProviderId;
 
+/** Optional vendor-native object filter for the motion signal reported to Matter. */
+export type MotionObjectType = 'any' | 'person';
+
+export function resolveMotionObjectType(
+    camera: { motionObjectType?: MotionObjectType },
+): MotionObjectType {
+    return camera.motionObjectType ?? 'any';
+}
+
+export function wantsPersonMotion(
+    camera: { motionObjectType?: MotionObjectType },
+): boolean {
+    return resolveMotionObjectType(camera) === 'person';
+}
+
 export interface MotionCallbacks {
     onActive: (active: boolean) => void;
     onPulse: () => void;

@@ -1,5 +1,6 @@
 import Onvif from 'onvif';
 import type { Camera } from '../types/index.js';
+import { streamSourceHostname } from '../utils/streamSourceUrl.js';
 
 export interface DiscoveredOnvifDevice {
     /** Stable ONVIF endpoint URN */
@@ -67,15 +68,7 @@ function isOnvifDeviceAlreadyAdded(device: DiscoveredOnvifDevice, cameras: Camer
                 // ignore malformed onvifUrl
             }
         }
-
-        try {
-            const rtsp = new URL(cam.rtspUrl);
-            if (rtsp.hostname.toLowerCase() === device.hostname.toLowerCase()) {
-                return true;
-            }
-        } catch {
-            // ignore malformed rtspUrl
-        }
+        if (streamSourceHostname(cam.rtspUrl) === device.hostname.toLowerCase()) return true;
     }
 
     return false;

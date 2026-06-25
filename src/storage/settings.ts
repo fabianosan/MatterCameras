@@ -12,6 +12,8 @@ export interface ProtectControllerSettings {
 
 export interface AppSettings {
     protectController?: ProtectControllerSettings;
+    /** Set after roster changes; cleared on bridge process startup. */
+    bridgeRestartPending?: boolean;
 }
 
 type SettingsData = { settings: AppSettings };
@@ -78,6 +80,21 @@ export class SettingsService {
 
     async clearProtectController(): Promise<void> {
         delete this.db.data!.settings.protectController;
+        await this.db.write();
+    }
+
+    isBridgeRestartPending(): boolean {
+        return this.db.data?.settings.bridgeRestartPending === true;
+    }
+
+    async setBridgeRestartPending(pending: boolean): Promise<void> {
+        this.db.data!.settings.bridgeRestartPending = pending;
+        await this.db.write();
+    }
+
+    async clearBridgeRestartPending(): Promise<void> {
+        if (!this.db.data?.settings.bridgeRestartPending) return;
+        delete this.db.data.settings.bridgeRestartPending;
         await this.db.write();
     }
 }

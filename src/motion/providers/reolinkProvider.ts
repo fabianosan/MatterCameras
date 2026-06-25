@@ -1,7 +1,8 @@
 import { Logger } from '@matter/general';
 import { motionConfig } from '../../config/motion.js';
 import type { Camera } from '../../types/index.js';
-import type { MotionCallbacks, MotionContext, MotionProvider, ProviderMatch } from '../types.js';
+import type { MotionCallbacks, MotionContext, MotionObjectType, MotionProvider, ProviderMatch } from '../types.js';
+import { resolveMotionObjectType } from '../types.js';
 import {
     cameraLooksLikeReolink,
     ReolinkClient,
@@ -13,6 +14,7 @@ const logger = Logger.get('ReolinkMotion');
 interface ActivePoll {
     client: ReolinkClient;
     channel: number;
+    motionObjectType: MotionObjectType;
     timer?: ReturnType<typeof setInterval>;
     holdTimer?: ReturnType<typeof setTimeout>;
     active: boolean;
@@ -49,12 +51,30 @@ export class ReolinkMotionProvider implements MotionProvider {
 
         this.stop(camera.id);
 
-        const client = new ReolinkClient(target.host, target.username, target.password);
+        const client = new ReolinkClient(target.host, target.username, target.password, {
+            port: target.port,
+            useHttps: target.useHttps,
+        });
         await client.ensureAuth();
+
+        void client.getWhiteLedState(target.channel)
+            .then(light => {
+                if (!light) {
+                    logger.info(`Reolink light capability unavailable camera=${camera.id} host=${target.host} ch=${target.channel}`);
+                    return;
+                }
+                logger.info(
+                    `Reolink light capability camera=${camera.id} host=${target.host} ch=${target.channel} enabled=${light.enabled} bright=${light.brightness ?? 'n/a'}`,
+                );
+            })
+            .catch(error => {
+                logger.debug(`Reolink light probe failed camera=${camera.id}: ${error}`);
+            });
 
         const poll: ActivePoll = {
             client,
             channel: target.channel,
+            motionObjectType: resolveMotionObjectType(camera),
             active: false,
             callbacks,
         };
@@ -84,7 +104,7 @@ export class ReolinkMotionProvider implements MotionProvider {
         if (!poll) return;
 
         try {
-            const motion = await poll.client.isMotionActive(poll.channel);
+            const motion = await poll.client.isMotionActive(poll.channel, poll.motionObjectType);
             if (motion) {
                 this.#trigger(poll);
             }

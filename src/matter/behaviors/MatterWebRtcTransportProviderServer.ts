@@ -23,6 +23,7 @@ import {
 } from '../webrtcIce.js';
 import { appConfig } from '../../config/app.js';
 import { buildSolicitOfferResponse } from './solicitOfferHandler.js';
+import { logHubEndpointAdoption } from '../hubAdoptionLog.js';
 
 const logger = Logger.get('MatterWebRtc');
 
@@ -87,6 +88,7 @@ export class MatterWebRtcTransportProviderServer extends CameraRequirements.WebR
         }
 
         const cameraId = String(this.endpoint.id);
+    logHubEndpointAdoption(cameraId, 'provideOffer');
         const sessionId = this.#allocateSessionId(request.webRtcSessionId);
         const hubEndpoint = this.#hubEndpoint(request.originatingEndpointId);
         const hubIceServers = request.iceServers?.length ?? 0;
@@ -259,6 +261,10 @@ export class MatterWebRtcTransportProviderServer extends CameraRequirements.WebR
         const session = this.#sessions.get(request.webRtcSessionId);
         const count = request.iceCandidates?.length ?? 0;
 
+        if (session) {
+            logHubEndpointAdoption(session.cameraId, 'provideIceCandidates', `count=${count}`);
+        }
+
         logger.info(`ProvideIceCandidates session=${request.webRtcSessionId} candidates=${count}`);
 
         if (!go2rtc || !session?.whepLocation || !session.whepEtag || count === 0) {
@@ -277,6 +283,9 @@ export class MatterWebRtcTransportProviderServer extends CameraRequirements.WebR
 
     override async endSession(request: WebRtcTransportProvider.EndSessionRequest) {
         const session = this.#sessions.get(request.webRtcSessionId);
+        if (session) {
+            logHubEndpointAdoption(session.cameraId, 'endSession');
+        }
         await this.#clearSession(request.webRtcSessionId);
         logger.info(`endSession camera=${session?.cameraId ?? '?'} session=${request.webRtcSessionId}`);
     }

@@ -12,6 +12,9 @@ plugins, implemented **in-process** (no RPC) for the Matter bridge.
 ```
 Camera (cameras.json)
     motionSource: auto | frame-diff | onvif | reolink-native | unifi-protect
+  motionObjectType: any | person
+ personSensorEnabled: false | true
+ reolinkLightEnabled: false | true
          │
          ▼
 MotionDetectionService
@@ -50,6 +53,15 @@ MotionCallbacks → streamContext → Matter Zone Management + OccupancySensing
 
 Each step runs only when `canHandle()` matches (e.g. Reolink needs `manufacturer: Reolink` or explicit source; UniFi needs `protectHost` + `protectCameraId`).
 
+### Optional trigger filter
+
+- `motionObjectType: any` keeps the existing behavior.
+- `motionObjectType: person` is supported only on **Reolink native** and **UniFi Protect**.
+- When `person` is selected, unsupported providers such as **ONVIF** and **frame-diff** do **not** match, so auto mode will not silently fall back to generic motion.
+- Matter still receives a binary motion/occupancy signal; this filter only changes what upstream vendor event is allowed to trigger it.
+- `personSensorEnabled: true` adds a second bridged Matter endpoint for that camera, using `motionObjectType: person` and reporting a separate occupancy-style signal to the hub.
+- `reolinkLightEnabled: true` (Reolink only) adds a bridged Matter On/Off Light endpoint when `GetWhiteLed` succeeds. Hub on/off commands call `SetWhiteLed`; state is polled every 5 s (env: `MOTION_REOLINK_LIGHT_POLL_MS`).
+
 ---
 
 ## ONVIF hardening (phase 2)
@@ -69,9 +81,12 @@ Env tuning: `MOTION_ONVIF_HOLD_MS` (default 30000).
 ## Reolink native (phase 3a)
 
 - Polls `GetMdState` + `GetAiState` on `http://{host}/api.cgi`
+- `motionObjectType: person` uses only `GetAiState.people`; `any` keeps `GetMdState || any AI`
 - Auto-selected when `manufacturer` contains `Reolink` and `motionSource: auto`
 - Optional `reolinkChannel` for NVR channels (default 0)
+- Prefers saved `reolinkHost` / `reolinkHttpPort` / `reolinkUseHttps` metadata when present; falls back to parsing RTSP credentials for legacy entries
 - Env: `MOTION_REOLINK_POLL_MS`, `MOTION_REOLINK_HOLD_MS`
+- Optional bridged spotlight: `reolinkLightEnabled: true` → Matter On/Off Light when `GetWhiteLed` is supported
 
 ---
 
@@ -79,7 +94,7 @@ Env tuning: `MOTION_ONVIF_HOLD_MS` (default 30000).
 
 - Requires `protectHost` (controller IP) and `protectCameraId` (24-char id from Protect)
 - Uses [`unifi-protect`](https://github.com/hjdhjd/unifi-protect) npm — **requires `npm run deploy`** (Docker image rebuild)
-- One WebSocket per Protect controller; routes `motion` events and `isMotionDetected` updates
+- One WebSocket per Protect controller; routes `motion` events / `isMotionDetected` updates for `any`, and smart person detection events for `person`
 - Env: `MOTION_UNIFI_HOLD_MS` (default 25000)
 - **Node.js ≥ 22** recommended (`unifi-protect` engine requirement)
 
@@ -108,9 +123,14 @@ Env tuning: `MOTION_ONVIF_HOLD_MS` (default 30000).
   "name": "Driveway",
   "rtspUrl": "rtsp://user:pass@192.168.1.50:554/stream",
   "motionSource": "auto",
+  "motionObjectType": "person",
+  "personSensorEnabled": true,
   "manufacturer": "Reolink",
   "onvifUrl": "http://192.168.1.50:80/onvif/device_service",
   "reolinkChannel": 0,
+  "reolinkHost": "192.168.1.50",
+  "reolinkHttpPort": 80,
+  "reolinkUseHttps": false,
   "protectHost": "192.168.1.1",
   "protectCameraId": "64b2e59f0106eb03e4001210"
 }

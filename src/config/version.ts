@@ -10,11 +10,16 @@ export const appVersion: string = JSON.parse(
 
 const SOFTWARE_VERSION_BASE = 300;
 
-let bridgeCameraCount = 0;
+let bridgeEndpointCount = 0;
 
 /** Set before bridged endpoints are created (drives softwareVersion for hub reprofile). */
+export function setBridgeEndpointCount(count: number): void {
+    bridgeEndpointCount = Math.max(0, count);
+}
+
+/** @deprecated Use setBridgeEndpointCount() */
 export function setBridgeCameraCount(count: number): void {
-    bridgeCameraCount = Math.max(0, count);
+    setBridgeEndpointCount(count);
 }
 
 /**
@@ -22,11 +27,11 @@ export function setBridgeCameraCount(count: number): void {
  * Tied to camera count so SmartThings re-interviews the bridge when the roster changes.
  */
 export function getMatterSoftwareVersion(): number {
-    return SOFTWARE_VERSION_BASE + bridgeCameraCount;
+    return SOFTWARE_VERSION_BASE + bridgeEndpointCount;
 }
 
 export function getMatterSoftwareVersionString(): string {
-    return `${appVersion}+${bridgeCameraCount}c`;
+    return `${appVersion}+${bridgeEndpointCount}e`;
 }
 
 /** @deprecated Use getMatterSoftwareVersion() */

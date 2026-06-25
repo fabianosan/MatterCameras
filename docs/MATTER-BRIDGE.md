@@ -41,7 +41,7 @@ Typical Zigbee/Wi-Fi Matter bridges (lights, plugs):
 |------|----------------|
 | Aggregator | `AggregatorEndpoint` on endpoint `1` (`src/matter/Bridge.ts`) |
 | Cameras before Matter online | All cameras from `data/cameras.json` are registered **before** `bridge.start()` so the hub never sees an empty `PartsList` |
-| Add while paired | Runtime `aggregator.add()` + `PartsList` / `softwareVersion` announce; app **restarts** so the new endpoint exists before Matter networking comes up |
+| Add while paired | Runtime `aggregator.add()` + `PartsList` / `softwareVersion` announce; operator can use **Restart Required** when a manual bridge reload is desired |
 | Hub notification | `notifyHubStructureChange()` bumps `softwareVersion` and re-reports aggregator `PartsList` |
 
 ### SmartThings creates one device per bridged endpoint
@@ -83,11 +83,11 @@ CaptureSnapshot camera=cam-…
 
 Try:
 
-1. Wait for the automatic bridge restart after adding a camera in the Web UI.
+1. After adding a camera in the Web UI, watch for bridge-side logs such as `Adding bridged camera` and `Bridge structure`.
 2. Open **MatterCameras Bridge** in SmartThings → pull down to refresh.
 3. Wait 2–5 minutes for card preview (hub polling).
 4. **Remove and re-pair the bridge** (cameras stay in `data/cameras.json`) — required if the hub paired before those cameras existed.
-5. Use **Restart Bridge** in the Web UI only as a last resort.
+5. Use **Restart Required** in the Web UI only as a last resort.
 
 ## Operational limits
 

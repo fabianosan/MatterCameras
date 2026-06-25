@@ -1,14 +1,17 @@
 import { bridge } from '../matter/Bridge.js';
 import { storage } from '../storage/db.js';
-import { setBridgeCameraCount } from '../config/version.js';
+import { setBridgeEndpointCount } from '../config/version.js';
 import type { Camera } from '../types/index.js';
+import { countBridgedEndpoints } from '../matter/personSensorConfig.js';
+import { markBridgeRestartRequired } from '../web/bridgeRestartState.js';
 
 export async function installCamera(config: Camera): Promise<Camera> {
     await storage.addCamera(config);
-    setBridgeCameraCount(storage.getCameras().length);
+    setBridgeEndpointCount(countBridgedEndpoints(storage.getCameras()));
     await bridge.addCamera(config);
     await bridge.go2rtc.addStream(config.id, config.name, config.rtspUrl);
     bridge.startMotionDetection(config);
+    await markBridgeRestartRequired();
     return config;
 }
 
@@ -17,13 +20,22 @@ export async function refreshCameraRuntime(existing: Camera, updated: Camera): P
 
     const rtspChanged = updated.rtspUrl !== existing.rtspUrl;
     const motionChanged = updated.motionSource !== existing.motionSource
+        || updated.motionObjectType !== existing.motionObjectType
+        || updated.personSensorEnabled !== existing.personSensorEnabled
+        || updated.reolinkLightEnabled !== existing.reolinkLightEnabled
         || updated.onvifUrl !== existing.onvifUrl
         || updated.username !== existing.username
         || updated.password !== existing.password
         || updated.protectHost !== existing.protectHost
         || updated.protectCameraId !== existing.protectCameraId
         || updated.reolinkChannel !== existing.reolinkChannel
+        || updated.reolinkHost !== existing.reolinkHost
+        || updated.reolinkHttpPort !== existing.reolinkHttpPort
+        || updated.reolinkUseHttps !== existing.reolinkUseHttps
         || updated.manufacturer !== existing.manufacturer;
+
+    const endpointCountChanged = updated.personSensorEnabled !== existing.personSensorEnabled
+        || updated.reolinkLightEnabled !== existing.reolinkLightEnabled;
 
     if (rtspChanged) {
         await bridge.go2rtc.removeStream(updated.id);
@@ -35,4 +47,11 @@ export async function refreshCameraRuntime(existing: Camera, updated: Camera): P
     if (motionChanged || rtspChanged) {
         bridge.startMotionDetection(updated);
     }
+
+    if (endpointCountChanged) {
+        setBridgeEndpointCount(countBridgedEndpoints(storage.getCameras()));
+        await bridge.notifyHubStructureChange();
+    }
+
+    await markBridgeRestartRequired();
 }

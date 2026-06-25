@@ -8,14 +8,35 @@ import { appConfig } from '../config/app.js';
 import { Camera } from '../types/index.js';
 import { Go2RTCClient } from '../streaming/Go2RTCClient.js';
 import { MotionDetectionService } from '../streaming/MotionDetectionService.js';
+import { ReolinkLightService } from '../streaming/ReolinkLightService.js';
 import { streamContext } from './behaviors/streamContext.js';
 import { BridgedDeviceBasicInformationServer } from '@matter/main/behaviors/bridged-device-basic-information';
 import { BridgedCameraDevice, bridgedCameraOptions } from './devices/BridgedCameraDevice.js';
+import { BridgedPersonSensorDevice, bridgedPersonSensorOptions } from './devices/BridgedPersonSensorDevice.js';
+import { BridgedReolinkLightDevice, bridgedReolinkLightOptions } from './devices/BridgedReolinkLightDevice.js';
 import { BasicInformationServer } from '@matter/main/behaviors/basic-information';
 import { DescriptorServer } from '@matter/main/behaviors/descriptor';
 import { getMatterSoftwareVersion, getMatterSoftwareVersionString } from '../config/version.js';
 import { getMatterStoragePath, wipeMatterStorage } from './matterStorage.js';
 import { EndpointNumber } from '@matter/types';
+import {
+    isPersonSensorEndpointId,
+    personSensorLabel,
+    shouldExposePersonSensor,
+} from './personSensorConfig.js';
+import {
+    isReolinkLightEndpointId,
+    reolinkLightEndpointId,
+    reolinkLightLabel,
+    shouldExposeReolinkLight,
+} from './reolinkLightConfig.js';
+import { OccupancySensing } from '@matter/types/clusters/occupancy-sensing';
+import { OccupancySensingServer } from '@matter/node/behaviors/occupancy-sensing';
+import { OnOffServer } from '@matter/node/behaviors/on-off';
+import { LevelControlServer } from '@matter/node/behaviors/level-control';
+import { CommissioningServer } from '@matter/node/behaviors/system/commissioning';
+import { randomInt } from 'node:crypto';
+import type { PairingInfo } from '../types/index.js';
 
 /** Matter Aggregator (bridge) device type — must match mDNS commissioning advert. */
 const BRIDGE_DEVICE_TYPE = DeviceTypeId(0x0e);
@@ -32,6 +53,7 @@ export class MatterBridge {
     private started = false;
     readonly go2rtc: Go2RTCClient;
     readonly motionDetection = new MotionDetectionService();
+    readonly reolinkLight = new ReolinkLightService();
 
     constructor() {
         this.go2rtc = new Go2RTCClient(appConfig.go2rtcUrl);
@@ -110,7 +132,7 @@ export class MatterBridge {
         }
 
         const partNumbers = this.#aggregatorPartNumbers();
-        const msg = `Bridge structure: ${this.cameraEndpoints.size} camera(s), `
+        const msg = `Bridge structure: ${this.cameraEndpoints.size} bridged endpoint(s), `
             + `softwareVersion=${version}, Matter endpoints=[${partNumbers.join(', ')}]`;
         console.log(msg);
     }
@@ -144,9 +166,10 @@ export class MatterBridge {
 
         for (const child of this.aggregator.parts) {
             const id = String(child.id);
-            if (id.startsWith('cam-') && !isLegacySlotEndpointId(id)) {
+            if ((id.startsWith('cam-') || isPersonSensorEndpointId(id) || isReolinkLightEndpointId(id))
+                && !isLegacySlotEndpointId(id)) {
                 this.cameraEndpoints.set(id, child);
-                console.log(`Restored bridged camera from storage: ${id}`);
+                console.log(`Restored bridged endpoint from storage: ${id}`);
             }
         }
     }
@@ -165,15 +188,35 @@ export class MatterBridge {
     async addCamera(camera: Camera) {
         if (!this.aggregator) return;
 
-        if (this.cameraEndpoints.has(camera.id)) {
-            console.warn(`Camera ${camera.id} already bridged`);
-            return;
-        }
-
         const existing = this.aggregator.parts.get(camera.id);
         if (existing) {
             this.cameraEndpoints.set(camera.id, existing);
             console.log(`Camera ${camera.name} (${camera.id}) already on aggregator`);
+            if (shouldExposePersonSensor(camera)) {
+                await this.#addPersonSensor(camera);
+            } else {
+                await this.#removePersonSensor(camera.id);
+            }
+            if (shouldExposeReolinkLight(camera)) {
+                await this.#ensureReolinkLight(camera);
+            } else {
+                await this.#removeReolinkLight(camera.id);
+            }
+            return;
+        }
+
+        if (this.cameraEndpoints.has(camera.id)) {
+            console.warn(`Camera ${camera.id} already bridged`);
+            if (shouldExposePersonSensor(camera)) {
+                await this.#addPersonSensor(camera);
+            } else {
+                await this.#removePersonSensor(camera.id);
+            }
+            if (shouldExposeReolinkLight(camera)) {
+                await this.#ensureReolinkLight(camera);
+            } else {
+                await this.#removeReolinkLight(camera.id);
+            }
             return;
         }
 
@@ -184,12 +227,19 @@ export class MatterBridge {
         );
         this.cameraEndpoints.set(camera.id, endpoint);
 
+        if (shouldExposePersonSensor(camera)) {
+            await this.#addPersonSensor(camera);
+        }
+        if (shouldExposeReolinkLight(camera)) {
+            await this.#ensureReolinkLight(camera);
+        }
+
         if (this.started) {
             await this.notifyHubStructureChange();
         }
     }
 
-    async getPairingInfo() {
+    async getPairingInfo(): Promise<PairingInfo> {
         if (!this.server) return { qrCode: '', manualPairingCode: '' };
 
         const { commissioning } = this.server.state;
@@ -198,6 +248,33 @@ export class MatterBridge {
             return { qrCode: qrPairingCode, manualPairingCode };
         }
         return { qrCode: '', manualPairingCode: '' };
+    }
+
+    /** Rotate the commissioning discriminator so SmartThings gets a new QR/manual code. */
+    async refreshPairingCodes(): Promise<PairingInfo> {
+        if (!this.server || this.isCommissioned()) {
+            return { qrCode: '', manualPairingCode: '' };
+        }
+
+        const current = this.server.state.commissioning.discriminator;
+        let discriminator = current;
+        while (discriminator === current) {
+            discriminator = randomInt(1, 4095);
+        }
+
+        await this.server.setStateOf(CommissioningServer, { discriminator });
+        console.log(`Refreshed Matter pairing codes discriminator=${discriminator}`);
+
+        try {
+            await this.server.act(async agent => {
+                const commissioning = agent.get(CommissioningServer);
+                await commissioning.enterCommissionableMode();
+            });
+        } catch (error) {
+            console.warn(`Pairing mDNS refresh failed after discriminator change: ${error}`);
+        }
+
+        return this.getPairingInfo();
     }
 
     isCommissioned() {
@@ -215,11 +292,47 @@ export class MatterBridge {
         await endpoint.setStateOf(BridgedDeviceBasicInformationServer, {
             nodeLabel: camera.name,
         });
+
+        if (shouldExposePersonSensor(camera)) {
+            const personEndpoint = await this.#ensurePersonSensor(camera);
+            await personEndpoint.setStateOf(BridgedDeviceBasicInformationServer, {
+                nodeLabel: personSensorLabel(camera),
+            });
+        } else {
+            await this.#removePersonSensor(camera.id);
+        }
+
+        if (shouldExposeReolinkLight(camera)) {
+            const lightEndpoint = await this.#ensureReolinkLight(camera);
+            if (lightEndpoint) {
+                await lightEndpoint.setStateOf(BridgedDeviceBasicInformationServer, {
+                    nodeLabel: reolinkLightLabel(camera),
+                });
+            }
+        } else {
+            await this.#removeReolinkLight(camera.id);
+        }
     }
 
     /** Start motion detection — call only after go2rtc stream is registered for this camera. */
     startMotionDetection(camera: Camera): void {
         this.motionDetection.startCamera(camera, this.go2rtc);
+        if (shouldExposePersonSensor(camera)) {
+            this.#startPersonSensorMotion(camera);
+        } else {
+            this.motionDetection.stopCamera(`person-${camera.id}`);
+        }
+        void this.#syncReolinkLightRuntime(camera);
+    }
+
+    async #syncReolinkLightRuntime(camera: Camera): Promise<void> {
+        const lightId = reolinkLightEndpointId(camera.id);
+        const lightEndpoint = this.cameraEndpoints.get(lightId) ?? this.aggregator?.parts.get(lightId);
+        if (shouldExposeReolinkLight(camera) && lightEndpoint) {
+            await this.#startReolinkLight(camera, lightEndpoint);
+            return;
+        }
+        this.reolinkLight.stop(camera.id);
     }
 
     async removeCamera(id: string) {
@@ -230,6 +343,10 @@ export class MatterBridge {
         }
         console.log(`Removing bridged camera: ${id}`);
         this.motionDetection.stopCamera(id);
+        this.motionDetection.stopCamera(`person-${id}`);
+        this.reolinkLight.stop(id);
+        await this.#removePersonSensor(id);
+        await this.#removeReolinkLight(id);
         await endpoint.delete();
         this.cameraEndpoints.delete(id);
 
@@ -261,6 +378,123 @@ export class MatterBridge {
         await wipeMatterStorage();
         console.log('Factory reset complete. Restarting...');
         process.exit(0);
+    }
+
+    async #addPersonSensor(camera: Camera): Promise<Endpoint> {
+        if (!this.aggregator) throw new Error('Bridge aggregator unavailable');
+
+        const id = `person-${camera.id}`;
+        const existing = this.cameraEndpoints.get(id) ?? this.aggregator.parts.get(id);
+        if (existing) {
+            this.cameraEndpoints.set(id, existing);
+            return existing;
+        }
+
+        console.log(`Adding bridged person sensor: ${camera.name} (${id})`);
+        const endpoint = await this.aggregator.add(
+            BridgedPersonSensorDevice,
+            bridgedPersonSensorOptions(camera),
+        );
+        this.cameraEndpoints.set(id, endpoint);
+        return endpoint;
+    }
+
+    async #ensurePersonSensor(camera: Camera): Promise<Endpoint> {
+        return this.#addPersonSensor(camera);
+    }
+
+    async #removePersonSensor(cameraId: string): Promise<void> {
+        const id = `person-${cameraId}`;
+        const endpoint = this.cameraEndpoints.get(id) ?? this.aggregator?.parts.get(id);
+        if (!endpoint) return;
+
+        console.log(`Removing bridged person sensor: ${id}`);
+        await endpoint.delete();
+        this.cameraEndpoints.delete(id);
+    }
+
+    #startPersonSensorMotion(camera: Camera): void {
+        const sensorId = `person-${camera.id}`;
+        const endpoint = this.cameraEndpoints.get(sensorId);
+        if (!endpoint) return;
+
+        const personMotionCamera: Camera = {
+            ...camera,
+            id: sensorId,
+            name: personSensorLabel(camera),
+            motionObjectType: 'person',
+            personSensorEnabled: false,
+            motionSource: camera.motionSource === 'reolink-native' || camera.motionSource === 'unifi-protect'
+                ? camera.motionSource
+                : 'auto',
+        };
+
+        this.motionDetection.startCamera(personMotionCamera, this.go2rtc, {
+            onActive: active => {
+                void endpoint.setStateOf(OccupancySensingServer, {
+                    occupancy: new OccupancySensing.Occupancy({ occupied: active }),
+                });
+            },
+            onPulse: () => undefined,
+        });
+    }
+
+    async #ensureReolinkLight(camera: Camera): Promise<Endpoint | undefined> {
+        if (!this.aggregator) throw new Error('Bridge aggregator unavailable');
+
+        const id = reolinkLightEndpointId(camera.id);
+        const existing = this.cameraEndpoints.get(id) ?? this.aggregator.parts.get(id);
+        if (existing) {
+            this.cameraEndpoints.set(id, existing);
+            await this.#startReolinkLight(camera, existing);
+            return existing;
+        }
+
+        const capable = await this.reolinkLight.probeCapability(camera);
+        if (!capable) {
+            console.log(`Reolink light unsupported camera=${camera.id} — skipping bridged light endpoint`);
+            return undefined;
+        }
+
+        console.log(`Adding bridged Reolink light: ${camera.name} (${id})`);
+        const endpoint = await this.aggregator.add(
+            BridgedReolinkLightDevice,
+            bridgedReolinkLightOptions(camera),
+        );
+        this.cameraEndpoints.set(id, endpoint);
+        await this.#startReolinkLight(camera, endpoint);
+
+        if (this.started) {
+            await this.notifyHubStructureChange();
+        }
+
+        return endpoint;
+    }
+
+    async #startReolinkLight(camera: Camera, endpoint: Endpoint): Promise<void> {
+        this.reolinkLight.stop(camera.id);
+        const started = await this.reolinkLight.start(camera, endpoint, state => {
+            void endpoint.setStateOf(OnOffServer, { onOff: state.on });
+            void endpoint.setStateOf(LevelControlServer, { currentLevel: state.level });
+        });
+        if (!started) {
+            await this.#removeReolinkLight(camera.id);
+        }
+    }
+
+    async #removeReolinkLight(cameraId: string): Promise<void> {
+        const id = reolinkLightEndpointId(cameraId);
+        this.reolinkLight.stop(cameraId);
+        const endpoint = this.cameraEndpoints.get(id) ?? this.aggregator?.parts.get(id);
+        if (!endpoint) return;
+
+        console.log(`Removing bridged Reolink light: ${id}`);
+        await endpoint.delete();
+        this.cameraEndpoints.delete(id);
+
+        if (this.started) {
+            await this.notifyHubStructureChange();
+        }
     }
 }
 

@@ -22,6 +22,8 @@ try {
         name: 'Alice',
         rtspUrl: 'rtsp://alice/stream',
         motionSource: 'auto',
+        motionObjectType: 'person',
+        personSensorEnabled: true,
         protectHost: '192.168.1.30',
         protectCameraId: 'protect-a',
         addSource: 'unifi-protect',
@@ -52,12 +54,16 @@ try {
 
     assert.equal(persisted.getCameras().length, 2);
     assert.equal(persisted.getCamera('cam-a')?.name, 'Alice');
+    assert.equal(persisted.getCamera('cam-a')?.motionObjectType, 'person');
+    assert.equal(persisted.getCamera('cam-a')?.personSensorEnabled, true);
 
     const raw = JSON.parse(readFileSync(dbFile, 'utf8')) as { cameras: Camera[] };
     assert.deepEqual(
         raw.cameras.map(camera => camera.id).sort(),
         ['cam-a', 'cam-b'],
     );
+    assert.equal(raw.cameras.find(camera => camera.id === 'cam-a')?.motionObjectType, 'person');
+    assert.equal(raw.cameras.find(camera => camera.id === 'cam-a')?.personSensorEnabled, true);
 } finally {
     rmSync(tempDir, { recursive: true, force: true });
 }

@@ -78,6 +78,15 @@ const baseCamera = {
     const protectPreferred = resolvePreferredProvider(protectCam, registry.providers());
     assert.equal(protectPreferred?.provider.id, 'unifi-protect');
 
+    const protectPersonPreferred = resolvePreferredProvider(
+        {
+            ...protectCam,
+            motionObjectType: 'person' as const,
+        },
+        registry.providers(),
+    );
+    assert.equal(protectPersonPreferred?.provider.id, 'unifi-protect');
+
     const onvifCam = {
         ...baseCamera,
         motionSource: 'onvif' as const,
@@ -85,6 +94,25 @@ const baseCamera = {
     };
     const onvifPreferred = resolvePreferredProvider(onvifCam, registry.providers());
     assert.equal(onvifPreferred?.provider.id, 'onvif');
+
+    const onvifPersonPreferred = resolvePreferredProvider(
+        {
+            ...onvifCam,
+            motionObjectType: 'person' as const,
+        },
+        registry.providers(),
+    );
+    assert.equal(onvifPersonPreferred, null);
+
+    const noVendorPersonPreferred = resolvePreferredProvider(
+        {
+            ...baseCamera,
+            motionSource: 'auto' as const,
+            motionObjectType: 'person' as const,
+        },
+        registry.providers(),
+    );
+    assert.equal(noVendorPersonPreferred, null);
 }
 
 // registry priority order

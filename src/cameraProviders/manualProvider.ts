@@ -1,4 +1,5 @@
 import type { Camera } from '../types/index.js';
+import { streamSourceHostname } from '../utils/streamSourceUrl.js';
 import type { CameraAddProvider, DiscoveredCameraDevice, ResolvedCameraDraft } from './types.js';
 
 export const manualProvider: CameraAddProvider = {
@@ -19,17 +20,9 @@ export const manualProvider: CameraAddProvider = {
 };
 
 export function isManualRtspAlreadyAdded(rtspUrl: string, cameras: Camera[]): boolean {
-    let host: string | undefined;
-    try {
-        host = new URL(rtspUrl).hostname.toLowerCase();
-    } catch {
-        return false;
-    }
+    const host = streamSourceHostname(rtspUrl);
+    if (!host) return false;
     return cameras.some(cam => {
-        try {
-            return new URL(cam.rtspUrl).hostname.toLowerCase() === host;
-        } catch {
-            return false;
-        }
+        return streamSourceHostname(cam.rtspUrl) === host;
     });
 }

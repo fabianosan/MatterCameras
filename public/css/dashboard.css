@@ -210,6 +210,16 @@ a.btn-ghost:visited {
     border: 1px solid var(--border-color);
 }
 
+.btn-restart-required {
+    background-color: #fee2e2;
+    color: #991b1b;
+    border: 1px solid #fca5a5;
+}
+
+.btn-restart-required:hover {
+    background-color: #fecaca;
+}
+
 .btn-sm {
     padding: 8px 14px;
     font-size: 0.85rem;

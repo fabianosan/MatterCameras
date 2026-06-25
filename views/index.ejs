@@ -1,4 +1,4 @@
-<%- include('partials/header', { pageTitle: 'Dashboard', bridgeStatus, appVersion, activePage: 'dashboard', returnTo: '/' }) %>
+<%- include('partials/header', { pageTitle: 'Dashboard', bridgeStatus, appVersion, activePage: 'dashboard', returnTo: '/', bridgeRestartPending }) %>
 
     <% const isCommissioned = bridgeStatus === 'Commissioned'; %>
     <% const addSourceLabel = (source, manufacturer, model) => {
@@ -56,11 +56,12 @@
                             </div>
                             <% const motionLabel = (() => {
                                 const s = cam.motionSource || 'frame-diff';
+                                const suffix = cam.motionObjectType === 'person' ? ' (person)' : '';
                                 if (s === 'auto') return 'Motion: Auto';
-                                if (s === 'onvif') return 'Motion: ONVIF';
-                                if (s === 'reolink-native') return 'Motion: Reolink';
-                                if (s === 'unifi-protect') return 'Motion: UniFi Protect';
-                                return 'Motion: Frame diff';
+                                if (s === 'onvif') return 'Motion: ONVIF' + suffix;
+                                if (s === 'reolink-native') return 'Motion: Reolink' + suffix;
+                                if (s === 'unifi-protect') return 'Motion: UniFi Protect' + suffix;
+                                return 'Motion: Frame diff' + suffix;
                             })(); %>
                             <% if (cam.motionSource && cam.motionSource !== 'frame-diff') { %>
                                 <p class="camera-meta"><%= motionLabel %></p>
@@ -101,11 +102,22 @@
                                     <%- include('partials/motion-options', {
                                         idPrefix: 'edit-' + cam.id,
                                         selectedMotion: cam.motionSource || 'frame-diff',
+                                        selectedMotionObjectType: cam.motionObjectType || 'any',
+                                        selectedPersonSensorEnabled: cam.personSensorEnabled || false,
+                                        selectedReolinkLightEnabled: cam.reolinkLightEnabled || false,
                                         addSource: cam.addSource || '',
                                         onvifUrl: cam.onvifUrl || '',
                                         protectHost: cam.protectHost || '',
                                         protectCameraId: cam.protectCameraId || '',
                                         reolinkChannel: cam.reolinkChannel ?? 0,
+                                        reolinkHost: cam.reolinkHost || '',
+                                        reolinkHttpPort: cam.reolinkHttpPort,
+                                        reolinkUseHttps: cam.reolinkUseHttps,
+                                        reolinkRtspPort: cam.reolinkRtspPort,
+                                        reolinkProtocol: cam.reolinkProtocol || '',
+                                        reolinkStream: cam.reolinkStream || '',
+                                        reolinkDeviceUid: cam.reolinkDeviceUid || '',
+                                        reolinkIsNvr: cam.reolinkIsNvr,
                                         manufacturer: cam.manufacturer || '',
                                         model: cam.model || '',
                                     }) %>
@@ -134,36 +146,45 @@
                     <div class="pairing-success">
                         <p><strong>Bridge paired successfully.</strong></p>
                         <p style="margin-top: 8px; color: var(--text-secondary);">
-                            Add or remove cameras on the left. When the bridge is paired, the app restarts
-                            automatically so SmartThings picks up the updated camera list (about 15 seconds).
+                            Add or remove cameras on the left. After roster changes, use Restart Required if
+                            you want to reload the bridge for SmartThings (about 15 seconds).
                         </p>
                     </div>
                 <% } else { %>
                     <p class="pairing-hint">
                         Your hub and this server must be on the same local network.
                         If the QR code does not work, use the manual pairing code below.
+                        Use <strong>New pairing code</strong> to generate a fresh QR after a failed scan.
                     </p>
                 <% } %>
 
+                <div id="pairing-content">
                 <% if (pairingInfo && pairingInfo.qrCode) { %>
-                    <img src="https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=<%= encodeURIComponent(pairingInfo.qrCode) %>"
+                    <img id="pairing-qr-img"
+                        src="https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=<%= encodeURIComponent(pairingInfo.qrCode) %>&t=<%= Date.now() %>"
                         alt="Matter Pairing QR">
 
                     <div style="margin-top: 16px;">
                         <small style="color: var(--text-secondary);">Manual code (SmartThings → Matter → Enter code)</small>
-                        <span class="pairing-code"><%= pairingInfo.manualPairingCode %></span>
+                        <span id="pairing-manual-code" class="pairing-code"><%= pairingInfo.manualPairingCode %></span>
                     </div>
 
                     <details class="technical-details">
                         <summary>Show technical details</summary>
-                        <pre><%= pairingInfo.qrCode %></pre>
+                        <pre id="pairing-qr-payload"><%= pairingInfo.qrCode %></pre>
                     </details>
                 <% } else if (!isCommissioned) { %>
-                    <p>Starting bridge...</p>
+                    <p id="pairing-waiting">Starting bridge…</p>
                 <% } %>
+                </div>
+
+                <p id="pairing-refresh-status" class="field-hint" hidden></p>
 
                 <div class="pairing-actions">
-                    <button type="button" onclick="window.location.reload()" class="btn btn-ghost">Refresh QR</button>
+                    <% if (!isCommissioned) { %>
+                        <button type="button" id="refresh-pairing-btn" class="btn btn-ghost">New pairing code</button>
+                        <button type="button" id="reload-pairing-btn" class="btn btn-ghost btn-sm">Reload</button>
+                    <% } %>
                 </div>
 
             </div>

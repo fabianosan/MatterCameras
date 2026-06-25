@@ -1,6 +1,7 @@
 import { RtspMotionDetector } from '../../streaming/rtspMotionDetector.js';
 import type { Camera } from '../../types/index.js';
 import type { MotionCallbacks, MotionContext, MotionProvider, ProviderMatch } from '../types.js';
+import { wantsPersonMotion } from '../types.js';
 
 /** Generic RTSP motion via consecutive JPEG frame comparison (go2rtc snapshots). */
 export class FrameDiffMotionProvider implements MotionProvider {
@@ -11,7 +12,8 @@ export class FrameDiffMotionProvider implements MotionProvider {
 
     readonly #detectors = new Map<string, RtspMotionDetector>();
 
-    canHandle(_camera: Camera): ProviderMatch {
+    canHandle(camera: Camera): ProviderMatch | null {
+        if (wantsPersonMotion(camera)) return null;
         return { providerId: 'frame-diff', reason: 'always available fallback' };
     }
 

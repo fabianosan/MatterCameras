@@ -17,9 +17,6 @@
         const protectCameraId = root.querySelector('[name="protectCameraId"]')?.value?.trim().toLowerCase() || '';
         if (protectHost || protectCameraId) return 'unifi-protect';
 
-        const onvifUrl = root.querySelector('[name="onvifUrl"]')?.value?.trim().toLowerCase() || '';
-        if (onvifUrl) return 'onvif';
-
         const manufacturer = root.querySelector('[name="manufacturer"]')?.value?.trim().toLowerCase() || '';
         const model = root.querySelector('[name="model"]')?.value?.trim().toLowerCase() || '';
 
@@ -37,6 +34,9 @@
         ) {
             return 'onvif';
         }
+
+        const onvifUrl = root.querySelector('[name="onvifUrl"]')?.value?.trim().toLowerCase() || '';
+        if (onvifUrl) return 'onvif';
 
         return AUTO_GROUP_BY_SOURCE[root.dataset.addSource] || '';
     }

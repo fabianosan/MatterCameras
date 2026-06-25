@@ -1,5 +1,6 @@
 import type { Camera } from '../types/index.js';
 import { redactRtspUrl } from './redactRtspUrl.js';
+import { streamSourceHasSensitiveCredentials } from './streamSourceUrl.js';
 
 /** Camera fields safe for Web UI / API responses (passwords never exposed). */
 export type PublicCamera = Omit<Camera, 'password'> & {
@@ -12,6 +13,6 @@ export function sanitizeCameraForPublic(camera: Camera): PublicCamera {
     return {
         ...rest,
         rtspUrlRedacted: redactRtspUrl(camera.rtspUrl),
-        hasPassword: Boolean(password || /\/\/[^:@/]+:[^@/]+@/.test(camera.rtspUrl)),
+        hasPassword: Boolean(password || streamSourceHasSensitiveCredentials(camera.rtspUrl)),
     };
 }

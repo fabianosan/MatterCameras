@@ -28,10 +28,25 @@ Motion detection still uses `src/motion/` providers after the camera is saved.
 | Id | Label | Discover | RTSP source |
 |----|-------|----------|-------------|
 | `unifi-protect` | UniFi Protect | Login to controller → list adopted cameras | `rtsps://user:pass@host:7441/{rtspAlias}` from Protect bootstrap |
-| `reolink` | Reolink | `GetDevInfo` on host → channels | `rtsp://host:554/h264Preview_XX_main` |
+| `reolink` | Reolink | `GetDevInfo` + `GetNetPort` + `GetChannelstatus` → active channels | RTSP from `GetRtspUrl`, fallback to capability-based `Preview_*` |
 | `tapo-sonoff` | Tapo / Sonoff | Camera IP → ONVIF :2020 | ONVIF `GetStreamUri` (Camera Account credentials) |
 | `onvif` | ONVIF | WS-Discovery UDP 3702 | ONVIF `GetStreamUri` |
 | `manual` | Manual RTSP | — | Operator pastes URL |
+
+## Reolink notes
+
+- Discovery now uses the Reolink API to capture real channel state, ports, and stream details instead of assuming `:554/h264Preview_XX_main`.
+- NVR / Home Hub discovery filters to active channels when channel status data is available.
+- Direct dual-lens cameras are still treated as one physical camera in the add flow; the helper does not create a second artificial entry for the extra lens stream.
+- The saved camera record now persists Reolink-specific connection metadata used later by native motion detection and future protocol selection:
+        - `reolinkHost`
+        - `reolinkHttpPort`
+        - `reolinkUseHttps`
+        - `reolinkRtspPort`
+        - `reolinkProtocol`
+        - `reolinkStream`
+        - `reolinkDeviceUid`
+        - `reolinkIsNvr`
 
 ## Saved UniFi Protect controller
 

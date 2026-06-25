@@ -1,6 +1,7 @@
 import { Logger } from '@matter/general';
 import type { Camera } from '../../types/index.js';
 import type { MotionCallbacks, MotionContext, MotionProvider, ProviderMatch } from '../types.js';
+import { resolveMotionObjectType } from '../types.js';
 import { attachProtectMotion, detachProtectMotion } from './unifi/protectHub.js';
 import { resolveProtectTarget } from './unifi/protectTarget.js';
 
@@ -41,6 +42,7 @@ export class UnifiProtectMotionProvider implements MotionProvider {
         await attachProtectMotion(
             camera.id,
             target,
+            resolveMotionObjectType(camera),
             callbacks.onActive,
             callbacks.onPulse,
         );
