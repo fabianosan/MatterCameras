@@ -12,7 +12,7 @@
     "setup": "bash scripts/setup.sh",
     "deploy": "node scripts/bump-deploy-version.mjs && npm run build && bash scripts/deploy.sh --no-bump",
     "quick-deploy": "node scripts/bump-deploy-version.mjs && npm run build && bash scripts/quick-deploy.sh --no-bump",
-    "test": "node --import tsx src/streaming/imageTransform.test.ts && node --import tsx src/streaming/resolveOnvifTarget.test.ts && node --import tsx src/utils/redactRtspUrl.test.ts && node --import tsx src/onvif/parseOnvifMotionEvent.test.ts && node --import tsx src/motion/suggestMotionProvider.test.ts && node --import tsx src/motion/resolveMotionProvider.test.ts && node --import tsx src/cameraProviders/buildProtectRtsp.test.ts"
+    "test": "node --import tsx src/streaming/imageTransform.test.ts && node --import tsx src/streaming/resolveOnvifTarget.test.ts && node --import tsx src/utils/redactRtspUrl.test.ts && node --import tsx src/onvif/parseOnvifMotionEvent.test.ts && node --import tsx src/motion/suggestMotionProvider.test.ts && node --import tsx src/motion/resolveMotionProvider.test.ts && node --import tsx src/cameraProviders/buildProtectRtsp.test.ts && node --import tsx src/storage/db.test.ts"
   },
   "keywords": [
     "matter",

@@ -108,6 +108,8 @@ See [docs/SCALING.md](docs/SCALING.md) for hardware recommendations, camera coun
 - Motion detection: less sensitive frame-diff (hysteresis, debounce, changed-pixel ratio) and default zone sensitivity 3; reduces false triggers on outdoor cameras.
 
 ### Fixed
+- **UniFi Protect bulk import stability** — `POST /api/camera-providers/unifi-protect/import` now reuses a single Protect login/bootstrap for the whole batch instead of logging in once per camera; production imports had been stopping after only a few cameras when repeated controller logins began failing.
+- **Camera roster persistence** — `StorageService` now clones returned camera objects and reloads lowdb before each write, preventing stale in-memory state from overwriting `data/cameras.json` with a partial roster during production imports.
 - **ONVIF motion PullPoint** — pass `path` and `preserveAddress` from `onvifUrl`; connect before subscribing; share one PullPoint per NVR endpoint (fixes `SOAP-ENV:Sender` when multiple cameras use the same host); broaden motion topic parsing.
 - **Version stuck after quick-deploy** — container was not restarted when already running; `/api/version` showed an older bump until manual `docker compose restart app`.
 - **Missing `onvif` in Docker image** — adding the dependency requires `npm run deploy` (image rebuild), not quick-deploy alone.

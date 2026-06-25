@@ -18,6 +18,7 @@ import { draftToCamera } from '../cameraProviders/installCamera.js';
 import { resolveProtectCredentials, protectControllerToSave } from '../cameraProviders/resolveControllerCreds.js';
 import {
     connectProtect,
+    draftFromProtectCamera,
     listProtectCameras,
     logoutProtect,
 } from '../cameraProviders/unifi/protectApi.js';
@@ -286,37 +287,53 @@ app.post('/api/camera-providers/unifi-protect/import', async (req, res) => {
         }
 
         const roster = storage.getCameras();
+        const api = await connectProtect(creds.host, creds.username, creds.password);
         let deviceIds = Array.isArray(req.body?.deviceIds)
             ? req.body.deviceIds.map((id: unknown) => String(id))
             : undefined;
 
-        if (!deviceIds?.length) {
-            const discovered = await unifiProtectProvider.discover(creds, roster);
-            deviceIds = discovered.map(d => d.id);
-        }
-
         const added: Array<{ id: string; name: string; protectCameraId: string }> = [];
         const errors: Array<{ deviceId: string; error: string }> = [];
 
-        for (const deviceId of deviceIds) {
-            try {
-                const draft = await unifiProtectProvider.resolve({
-                    deviceId,
-                    host: creds.host,
-                    username: creds.username,
-                    password: creds.password,
-                    payload: { host: creds.host, cameraId: deviceId },
-                });
-                const config = draftToCamera(draft);
-                await installCamera(config);
-                added.push({
-                    id: config.id,
-                    name: config.name,
-                    protectCameraId: config.protectCameraId ?? deviceId,
-                });
-            } catch (error) {
-                errors.push({ deviceId, error: String(error) });
+        try {
+            const rows = listProtectCameras(api);
+            const hostKey = creds.host.toLowerCase();
+
+            if (!deviceIds?.length) {
+                deviceIds = rows
+                    .filter(row => row.isAdopted && !row.isAdoptedByOther)
+                    .filter(row => !roster.some(
+                        cam => cam.protectCameraId === row.id && cam.protectHost?.toLowerCase() === hostKey,
+                    ))
+                    .map(row => row.id);
             }
+
+            for (const deviceId of deviceIds) {
+                try {
+                    const row = rows.find(camera => camera.id === deviceId);
+                    if (!row) {
+                        throw new Error('Camera not found on Protect controller');
+                    }
+
+                    const draft = draftFromProtectCamera(
+                        creds.host,
+                        row,
+                        creds.username,
+                        creds.password,
+                    );
+                    const config = draftToCamera(draft);
+                    await installCamera(config);
+                    added.push({
+                        id: config.id,
+                        name: config.name,
+                        protectCameraId: config.protectCameraId ?? deviceId,
+                    });
+                } catch (error) {
+                    errors.push({ deviceId, error: String(error) });
+                }
+            }
+        } finally {
+            logoutProtect(api);
         }
 
         if (added.length > 0 && bridge.isCommissioned()) {
