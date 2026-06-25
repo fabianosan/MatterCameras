@@ -4,6 +4,8 @@ data/matter-storage/
 data/cameras.json
 data/config.json
 data/go2rtc.yaml
+data/settings.json
+.vscode/
 .env
 deploy.env
 *.log

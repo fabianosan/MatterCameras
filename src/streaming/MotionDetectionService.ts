@@ -64,9 +64,6 @@ export class MotionDetectionService {
             this.#registry.stopCamera(cameraId, providerId);
             this.#activeProvider.delete(cameraId);
         }
-        streamContext.reportMotionActivity.delete(cameraId);
-        streamContext.reportMotionPulse.delete(cameraId);
-        streamContext.motionSensitivity.delete(cameraId);
     }
 
     applySensitivity(cameraId: string): void {
