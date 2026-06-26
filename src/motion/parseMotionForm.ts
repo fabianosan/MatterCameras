@@ -33,6 +33,11 @@ export function parseOptionalInt(raw: unknown): number | undefined {
 }
 
 export function parseOptionalBoolean(raw: unknown): boolean | undefined {
+    if (Array.isArray(raw)) {
+        if (raw.some(v => v === true || v === 'true' || v === '1' || v === 1)) return true;
+        if (raw.some(v => v === false || v === 'false' || v === '0' || v === 0)) return false;
+        return undefined;
+    }
     if (raw === true || raw === 'true' || raw === '1' || raw === 1) return true;
     if (raw === false || raw === 'false' || raw === '0' || raw === 0) return false;
     return undefined;
@@ -78,7 +83,7 @@ export function parseCameraMotionFields(body: Record<string, unknown>): Pick<
     ]);
     return {
         motionSource: parseMotionSource(body.motionSource),
-        motionObjectType: parseMotionObjectType(body.motionObjectType),
+        motionObjectType: 'any',
         personSensorEnabled: parseOptionalBoolean(body.personSensorEnabled ?? body.presenceSensorEnabled),
         reolinkLightEnabled: parseOptionalBoolean(body.reolinkLightEnabled),
         onvifUrl: String(body.onvifUrl ?? '').trim() || undefined,

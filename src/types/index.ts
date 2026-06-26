@@ -28,6 +28,8 @@ export interface Camera {
     personSensorEnabled?: boolean;
     /** Whether to expose a separate bridged Reolink spotlight (WhiteLed) switch. */
     reolinkLightEnabled?: boolean;
+    /** Set by hardware probe — false hides the spotlight option in the Web UI. */
+    reolinkLightCapable?: boolean;
     onvifUrl?: string;
     username?: string;
     password?: string;

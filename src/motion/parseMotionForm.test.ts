@@ -8,13 +8,14 @@ assert.equal(parseOptionalBoolean(false), false);
 assert.equal(parseOptionalBoolean('false'), false);
 assert.equal(parseOptionalBoolean('0'), false);
 assert.equal(parseOptionalBoolean(''), undefined);
+assert.equal(parseOptionalBoolean(['false', 'true']), true);
+assert.equal(parseOptionalBoolean(['false']), false);
 assert.equal(parseMotionObjectType('person'), 'person');
 assert.equal(parseMotionObjectType('unknown'), 'any');
 
 {
     const parsed = parseCameraMotionFields({
         motionSource: 'reolink-native',
-        motionObjectType: 'person',
         presenceSensorEnabled: 'true',
         reolinkLightEnabled: 'true',
         username: 'admin',
@@ -35,7 +36,7 @@ assert.equal(parseMotionObjectType('unknown'), 'any');
 
     assert.deepEqual(parsed, {
         motionSource: 'reolink-native',
-        motionObjectType: 'person',
+        motionObjectType: 'any',
         personSensorEnabled: true,
         reolinkLightEnabled: true,
         onvifUrl: undefined,
@@ -56,6 +57,19 @@ assert.equal(parseMotionObjectType('unknown'), 'any');
         protectCameraId: undefined,
         addSource: 'reolink',
     });
+}
+
+{
+    const parsed = parseCameraMotionFields({
+        motionSource: 'auto',
+        personSensorEnabled: ['false', 'true'],
+        reolinkLightEnabled: ['false', 'true'],
+        manufacturer: 'Reolink',
+        addSource: 'reolink',
+    });
+
+    assert.equal(parsed.personSensorEnabled, true);
+    assert.equal(parsed.reolinkLightEnabled, true);
 }
 
 console.log('parseMotionForm.test.ts: ok');

@@ -1,3 +1,4 @@
+import { motionConfig } from '../../../config/motion.js';
 import type { Camera } from '../../../types/index.js';
 import type { MotionObjectType } from '../../types.js';
 
@@ -84,6 +85,28 @@ export function reolinkAiStateMatches(
         const entry = state[key];
         return Boolean(entry && typeof entry === 'object' && entry.alarm_state === 1);
     });
+}
+
+export interface ReolinkWhiteLedProbeSteps {
+    initial: ReolinkWhiteLedState | null;
+    setOnOk: boolean;
+    afterSetOn: ReolinkWhiteLedState | null;
+    setOffOk?: boolean;
+    afterSetOff?: ReolinkWhiteLedState | null;
+    restoreOnOk?: boolean;
+    afterRestoreOn?: ReolinkWhiteLedState | null;
+}
+
+/** Pure check: WhiteLed hardware actually toggled after SetWhiteLed (not just API success). */
+export function reolinkWhiteLedHardwareVerified(steps: ReolinkWhiteLedProbeSteps): boolean {
+    if (!steps.initial) return false;
+
+    if (steps.initial.enabled) {
+        if (!steps.setOffOk || !steps.afterSetOff || steps.afterSetOff.enabled) return false;
+        return Boolean(steps.restoreOnOk && steps.afterRestoreOn?.enabled);
+    }
+
+    return steps.setOnOk && Boolean(steps.afterSetOn?.enabled);
 }
 
 export function parseReolinkWhiteLedState(rows: ReolinkResponse[]): ReolinkWhiteLedState | null {
@@ -266,6 +289,75 @@ export class ReolinkClient {
 
         return reolinkCommandSucceeded(rows);
     }
+
+    /** Poll GetWhiteLed until `enabled` matches or attempts are exhausted. */
+    async waitWhiteLedState(channel: number, expectedEnabled: boolean): Promise<boolean> {
+        const attempts = motionConfig.reolinkLightProbeAttempts;
+        const delayMs = motionConfig.reolinkLightProbePollMs;
+
+        for (let attempt = 0; attempt < attempts; attempt++) {
+            if (attempt > 0) {
+                await sleep(delayMs);
+            }
+
+            const state = await this.getWhiteLedState(channel).catch(() => null);
+            if (state && state.enabled === expectedEnabled) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Active hardware probe: briefly toggles WhiteLed and confirms GetWhiteLed reflects the change.
+     * NVR channels without a spotlight often accept SetWhiteLed but never report enabled=true.
+     */
+    async verifyWhiteLedControl(channel: number): Promise<boolean> {
+        const initial = await this.getWhiteLedState(channel);
+        if (!initial) return false;
+
+        const bright = initial.brightness && initial.brightness > 0 ? initial.brightness : 50;
+
+        if (initial.enabled) {
+            const setOffOk = await this.setWhiteLed(channel, false, bright);
+            const afterSetOff = setOffOk
+                ? await this.readWhiteLedAfterWait(channel, false)
+                : null;
+            const restoreOnOk = afterSetOff && !afterSetOff.enabled
+                ? await this.setWhiteLed(channel, true, bright)
+                : false;
+            const afterRestoreOn = restoreOnOk
+                ? await this.readWhiteLedAfterWait(channel, true)
+                : null;
+
+            return reolinkWhiteLedHardwareVerified({
+                initial,
+                setOnOk: false,
+                afterSetOn: null,
+                setOffOk,
+                afterSetOff,
+                restoreOnOk,
+                afterRestoreOn,
+            });
+        }
+
+        const setOnOk = await this.setWhiteLed(channel, true, bright);
+        const afterSetOn = setOnOk ? await this.readWhiteLedAfterWait(channel, true) : null;
+        await this.setWhiteLed(channel, false, bright).catch(() => undefined);
+
+        return reolinkWhiteLedHardwareVerified({
+            initial,
+            setOnOk,
+            afterSetOn,
+        });
+    }
+
+    async readWhiteLedAfterWait(channel: number, expectedEnabled: boolean): Promise<ReolinkWhiteLedState | null> {
+        const matched = await this.waitWhiteLedState(channel, expectedEnabled);
+        if (!matched) return null;
+        return this.getWhiteLedState(channel).catch(() => null);
+    }
 }
 
 export function reolinkCommandSucceeded(rows: ReolinkResponse[]): boolean {
@@ -282,6 +374,10 @@ function extractToken(rows: ReolinkResponse[]): string | undefined {
 function extractLeaseSeconds(rows: ReolinkResponse[]): number {
     const value = rows[0]?.value as { Token?: { leaseTime?: number } } | undefined;
     return value?.Token?.leaseTime ?? 3600;
+}
+
+function sleep(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
 }
 
 function buildReolinkApiUrl(host: string, connection?: ReolinkConnectionOptions): URL {

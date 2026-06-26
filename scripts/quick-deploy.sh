@@ -14,6 +14,11 @@
 
 set -euo pipefail
 
+if command -v uname >/dev/null 2>&1 && uname -s 2>/dev/null | grep -qiE 'mingw|msys'; then
+    echo "On Windows, use ./quick-deploy.ps1 or npm run quick-deploy (tar+ssh sync)." >&2
+    exit 1
+fi
+
 NO_BUMP=false
 for arg in "$@"; do
     case "$arg" in
@@ -30,6 +35,12 @@ fi
 source "${ROOT}/scripts/deploy-env.sh"
 load_deploy_env "${ROOT}"
 
+# shellcheck source=deploy-ssh-env.sh
+source "${ROOT}/scripts/deploy-ssh-env.sh"
+setup_deploy_ssh
+deploy_ssh_mux_start
+trap 'deploy_ssh_mux_stop' EXIT
+
 HOST="${DEPLOY_HOST}"
 USER_NAME="${DEPLOY_USER}"
 DEST="${DEPLOY_DIR}"
@@ -41,6 +52,8 @@ fi
 
 DEPLOY_VERSION="$(node -e "const fs=require('fs'); const path=require('path'); const root=process.argv[1]; const pkg=JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8')); console.log(pkg.version);" "${ROOT_NODE}")"
 echo "==> Quick deploy MatterCameras v${DEPLOY_VERSION} → ${USER_NAME}@${HOST}:${DEST}"
+
+export RSYNC_RSH="${DEPLOY_RSYNC_RSH}"
 
 if [ ! -d "${ROOT}/dist" ]; then
     echo "ERROR: ${ROOT}/dist not found. Run 'npm run build' first." >&2
@@ -69,7 +82,7 @@ rsync -rlvz --omit-dir-times --no-perms --no-owner --no-group \
 rsync -rlvz --omit-dir-times --no-perms --no-owner --no-group \
   "${ROOT}/package.json" "${USER_NAME}@${HOST}:${DEST}/package.json"
 
-ssh "${USER_NAME}@${HOST}" "cd ${DEST} && docker compose up -d app && docker compose restart app && sleep 4 && docker compose ps app"
+bash "${ROOT}/scripts/deploy-remote.sh" quick
 
 echo "==> Quick deploy complete (v${DEPLOY_VERSION})."
 echo "    Verify: curl -s http://${HOST}:3202/api/version"

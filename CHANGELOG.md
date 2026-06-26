@@ -61,11 +61,18 @@ See [docs/SCALING.md](docs/SCALING.md) for hardware recommendations, camera coun
 
 ## [Unreleased]
 
+### Changed
+- **Reolink spotlight probe** — bridged light endpoints now require an active WhiteLed hardware check (`SetWhiteLed` + `GetWhiteLed` confirmation). NVR channels without a spotlight no longer get a phantom SmartThings light. The Web UI **checkbox** is hidden automatically when the probe marks the camera as not capable (`reolinkLightCapable: false`).
+- **Windows deploy (ARM64)** — `deploy.ps1` / `quick-deploy.ps1` sync with Git `tar` + OpenSSH instead of `rsync` (MSYS2 rsync segfaults under Git Bash on ARM Windows). SSH **multiplexing** (`ControlMaster`) prompts for the password once per run. `npm run deploy` routes to the PowerShell wrappers on `win32`.
+- **Person detection vs camera motion** — the Matter camera endpoint always uses generic motion (`auto` → vendor native → ONVIF → frame diff). Person detection is only available via the optional **person presence sensor** checkbox (Reolink / UniFi Protect). Legacy `motionObjectType: person` on the camera record is migrated to the separate sensor on save.
+
+### Fixed
+- **Person presence / Reolink light checkboxes** — saving with the checkbox checked no longer drops the setting (Express submitted both hidden `false` and checkbox `true`; the parser now treats that as enabled).
+
 ### Added
 - **Separate bridged Reolink light** — Reolink cameras with WhiteLed support can expose an extra Matter **Dimmable Light** endpoint (`light-{cameraId}`) with on/off and brightness via `SetWhiteLed` / `GetWhiteLed` (maps to SmartThings `switch` + `switchLevel`).
 - Git sync helpers for switching machines safely: `sync.sh`, `sync.ps1`, and `sync.cmd`.
-- **Separate bridged person sensor** — supported Reolink and UniFi cameras can now expose an extra Matter endpoint dedicated to person-only events, in addition to the camera endpoint itself.
-- **Person-only vendor motion trigger** — per-camera **Trigger on → Person only** for **Reolink native** and **UniFi Protect**. Reolink now filters on AI `people`; UniFi filters on Protect smart detection person events. Unsupported fallbacks (ONVIF / frame-diff) no longer silently downgrade a `person` request back to generic motion.
+- **Separate bridged person sensor** — supported Reolink and UniFi cameras can expose an extra Matter endpoint dedicated to person-only events, separate from the camera motion signal.
 - Windows PowerShell helper scripts: `deploy.ps1`, `quick-deploy.ps1`, and `commit.ps1`.
 - Windows root helper scripts: `deploy.cmd`, `quick-deploy.cmd`, and `commit.cmd`.
 - Root helper scripts: `./deploy.sh`, `./quick-deploy.sh`, and `./commit.sh` for faster operator workflows from the repository root.

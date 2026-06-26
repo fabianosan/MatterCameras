@@ -9,6 +9,7 @@ import { setBridgeEndpointCount, appVersion } from './config/version.js';
 import { streamContext } from './matter/behaviors/streamContext.js';
 import { getMatterStoragePath, wipeMatterStorage } from './matter/matterStorage.js';
 import { countBridgedEndpoints, expectedBridgedEndpointIds } from './matter/personSensorConfig.js';
+import { syncReolinkLightCapability } from './web/cameraInstall.js';
 
 let staleRecoveryInProgress = false;
 
@@ -123,9 +124,13 @@ async function main() {
         );
     }
     for (const cam of cameras) {
-        await bridge.addCamera(cam);
-        await bridge.go2rtc.addStream(cam.id, cam.name, cam.rtspUrl);
+        const camera = cam.reolinkLightCapable === undefined
+            ? await syncReolinkLightCapability(cam)
+            : cam;
+        await bridge.addCamera(camera);
+        await bridge.go2rtc.addStream(camera.id, camera.name, camera.rtspUrl);
     }
+    setBridgeEndpointCount(countBridgedEndpoints(storage.getCameras()));
     await bridge.go2rtc.syncAllStreams();
 
     // Warm ffmpeg H.264 transcoders so the first live view does not hit a 5s+ cold start.
@@ -143,7 +148,8 @@ async function main() {
 
     // Motion polls go2rtc JPEG frames — must run only after every stream is registered.
     for (const cam of cameras) {
-        bridge.startMotionDetection(cam);
+        const camera = storage.getCamera(cam.id) ?? cam;
+        bridge.startMotionDetection(camera);
     }
     console.log(`Motion detection active for ${cameras.length} camera(s)`);
 

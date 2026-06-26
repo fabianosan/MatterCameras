@@ -12,4 +12,8 @@ export const motionConfig = {
     unifiHoldMs: Number(process.env.MOTION_UNIFI_HOLD_MS ?? 25_000),
     /** Reolink WhiteLed state poll interval for bridged spotlight endpoints (ms). */
     reolinkLightPollMs: Number(process.env.MOTION_REOLINK_LIGHT_POLL_MS ?? 5_000),
+    /** Delay between WhiteLed hardware probe polls (ms). */
+    reolinkLightProbePollMs: Number(process.env.MOTION_REOLINK_LIGHT_PROBE_POLL_MS ?? 400),
+    /** Max polls while verifying WhiteLed hardware responds to SetWhiteLed. */
+    reolinkLightProbeAttempts: Number(process.env.MOTION_REOLINK_LIGHT_PROBE_ATTEMPTS ?? 4),
 };

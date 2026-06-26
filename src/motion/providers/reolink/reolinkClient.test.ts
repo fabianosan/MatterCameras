@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import type { Camera } from '../../../types/index.js';
-import { parseReolinkWhiteLedState, reolinkAiStateMatches, reolinkCommandSucceeded, resolveReolinkTarget } from './reolinkClient.js';
+import { parseReolinkWhiteLedState, reolinkAiStateMatches, reolinkCommandSucceeded, reolinkWhiteLedHardwareVerified, resolveReolinkTarget } from './reolinkClient.js';
 
 {
     const camera: Camera = {
@@ -98,6 +98,38 @@ import { parseReolinkWhiteLedState, reolinkAiStateMatches, reolinkCommandSucceed
     assert.equal(reolinkCommandSucceeded([{ code: 0 }]), true);
     assert.equal(reolinkCommandSucceeded([{ code: 1 }]), false);
     assert.equal(reolinkCommandSucceeded([]), false);
+}
+
+{
+    const initialOff = { enabled: false, brightness: 85 };
+
+    assert.equal(reolinkWhiteLedHardwareVerified({
+        initial: initialOff,
+        setOnOk: true,
+        afterSetOn: { enabled: true, brightness: 85 },
+    }), true);
+
+    assert.equal(reolinkWhiteLedHardwareVerified({
+        initial: initialOff,
+        setOnOk: true,
+        afterSetOn: { enabled: false, brightness: 85 },
+    }), false);
+
+    assert.equal(reolinkWhiteLedHardwareVerified({
+        initial: { enabled: true, brightness: 60 },
+        setOnOk: false,
+        afterSetOn: null,
+        setOffOk: true,
+        afterSetOff: { enabled: false, brightness: 60 },
+        restoreOnOk: true,
+        afterRestoreOn: { enabled: true, brightness: 60 },
+    }), true);
+
+    assert.equal(reolinkWhiteLedHardwareVerified({
+        initial: null,
+        setOnOk: true,
+        afterSetOn: { enabled: true, brightness: 50 },
+    }), false);
 }
 
 console.log('reolinkClient.test.ts: ok');

@@ -20,6 +20,9 @@ import { getMatterSoftwareVersion, getMatterSoftwareVersionString } from '../con
 import { getMatterStoragePath, wipeMatterStorage } from './matterStorage.js';
 import { EndpointNumber } from '@matter/types';
 import {
+    buildCameraMotionCamera,
+    buildPersonSensorMotionCamera,
+    countBridgedEndpoints,
     isPersonSensorEndpointId,
     personSensorLabel,
     shouldExposePersonSensor,
@@ -316,7 +319,7 @@ export class MatterBridge {
 
     /** Start motion detection — call only after go2rtc stream is registered for this camera. */
     startMotionDetection(camera: Camera): void {
-        this.motionDetection.startCamera(camera, this.go2rtc);
+        this.motionDetection.startCamera(buildCameraMotionCamera(camera), this.go2rtc);
         if (shouldExposePersonSensor(camera)) {
             this.#startPersonSensorMotion(camera);
         } else {
@@ -414,20 +417,9 @@ export class MatterBridge {
     }
 
     #startPersonSensorMotion(camera: Camera): void {
-        const sensorId = `person-${camera.id}`;
-        const endpoint = this.cameraEndpoints.get(sensorId);
+        const personMotionCamera = buildPersonSensorMotionCamera(camera);
+        const endpoint = this.cameraEndpoints.get(personMotionCamera.id);
         if (!endpoint) return;
-
-        const personMotionCamera: Camera = {
-            ...camera,
-            id: sensorId,
-            name: personSensorLabel(camera),
-            motionObjectType: 'person',
-            personSensorEnabled: false,
-            motionSource: camera.motionSource === 'reolink-native' || camera.motionSource === 'unifi-protect'
-                ? camera.motionSource
-                : 'auto',
-        };
 
         this.motionDetection.startCamera(personMotionCamera, this.go2rtc, {
             onActive: active => {

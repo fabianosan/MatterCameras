@@ -1,6 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+if command -v uname >/dev/null 2>&1 && uname -s 2>/dev/null | grep -qiE 'mingw|msys'; then
+    echo "On Windows, use ./deploy.ps1 or npm run deploy (tar+ssh sync)." >&2
+    echo "Git Bash + rsync often crashes on ARM Windows." >&2
+    exit 1
+fi
+
 # NEVER rsync these runtime paths from the workstation (see also docs/DEPLOY.md):
 #   data/cameras.json, data/config.json, data/go2rtc.yaml, data/matter-storage/, .env
 
@@ -20,6 +26,12 @@ fi
 source "${ROOT}/scripts/deploy-env.sh"
 load_deploy_env "${ROOT}"
 
+# shellcheck source=deploy-ssh-env.sh
+source "${ROOT}/scripts/deploy-ssh-env.sh"
+setup_deploy_ssh
+deploy_ssh_mux_start
+trap 'deploy_ssh_mux_stop' EXIT
+
 HOST="${DEPLOY_HOST}"
 USER="${DEPLOY_USER}"
 DEST="${DEPLOY_DIR}"
@@ -31,6 +43,8 @@ fi
 
 DEPLOY_VERSION="$(node -e "const fs=require('fs'); const path=require('path'); const root=process.argv[1]; const pkg=JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8')); console.log(pkg.version);" "${ROOT_NODE}")"
 echo "==> Deploy MatterCameras v${DEPLOY_VERSION} → ${USER}@${HOST}:${DEST}"
+
+export RSYNC_RSH="${DEPLOY_RSYNC_RSH}"
 
 rsync -rlvz --delete --omit-dir-times --no-perms --no-owner --no-group \
   --exclude node_modules \
@@ -64,20 +78,7 @@ rsync -rlvz --delete --omit-dir-times --no-perms --no-owner --no-group \
   "${ROOT}/dist/" "${USER}@${HOST}:${DEST}/dist/"
 
 echo "==> Building and starting containers..."
-ssh "${USER}@${HOST}" bash -s <<EOF
-set -euo pipefail
-cd "${DEST}"
-mkdir -p data
-[ -f data/cameras.json ] || echo '{"cameras":[]}' > data/cameras.json
-docker compose down 2>/dev/null || true
-docker compose up --build -d
-docker compose restart app
-docker compose ps
-echo ""
-echo "Web UI:  http://${HOST}:3202"
-echo "go2rtc:  http://${HOST}:3203"
-echo "Matter:  ${HOST}:5550"
-EOF
+bash "${ROOT}/scripts/deploy-remote.sh" full
 
 echo "==> Deploy complete (v${DEPLOY_VERSION})."
 echo "    Verify: curl -s http://${HOST}:3202/api/version"

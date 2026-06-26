@@ -56,15 +56,20 @@
                             </div>
                             <% const motionLabel = (() => {
                                 const s = cam.motionSource || 'frame-diff';
-                                const suffix = cam.motionObjectType === 'person' ? ' (person)' : '';
                                 if (s === 'auto') return 'Motion: Auto';
-                                if (s === 'onvif') return 'Motion: ONVIF' + suffix;
-                                if (s === 'reolink-native') return 'Motion: Reolink' + suffix;
-                                if (s === 'unifi-protect') return 'Motion: UniFi Protect' + suffix;
-                                return 'Motion: Frame diff' + suffix;
+                                if (s === 'onvif') return 'Motion: ONVIF';
+                                if (s === 'reolink-native') return 'Motion: Reolink';
+                                if (s === 'unifi-protect') return 'Motion: UniFi Protect';
+                                return 'Motion: Frame diff';
                             })(); %>
                             <% if (cam.motionSource && cam.motionSource !== 'frame-diff') { %>
                                 <p class="camera-meta"><%= motionLabel %></p>
+                            <% } %>
+                            <% if (cam.personSensorEnabled) { %>
+                                <p class="camera-meta">Person presence sensor enabled</p>
+                            <% } %>
+                            <% if (cam.reolinkLightEnabled) { %>
+                                <p class="camera-meta">Reolink spotlight enabled</p>
                             <% } %>
                             <% if (cam.codec) { %>
                                 <p class="camera-meta">Codec: <%= cam.codec.toUpperCase() %></p>
@@ -87,8 +92,7 @@
 
                             <label>RTSP / ONVIF Stream URL</label>
                             <input type="text" name="rtspUrl" value="<%= cam.rtspUrl %>" required>
-                            <p class="field-hint">rtsp://user:password@192.168.x.x:554/stream</p>
-
+                            
                             <details class="advanced-toggle">
                                 <summary>Advanced options</summary>
                                 <div class="advanced-options">
@@ -102,9 +106,9 @@
                                     <%- include('partials/motion-options', {
                                         idPrefix: 'edit-' + cam.id,
                                         selectedMotion: cam.motionSource || 'frame-diff',
-                                        selectedMotionObjectType: cam.motionObjectType || 'any',
                                         selectedPersonSensorEnabled: cam.personSensorEnabled || false,
                                         selectedReolinkLightEnabled: cam.reolinkLightEnabled || false,
+                                        reolinkLightCapable: cam.reolinkLightCapable,
                                         addSource: cam.addSource || '',
                                         onvifUrl: cam.onvifUrl || '',
                                         protectHost: cam.protectHost || '',

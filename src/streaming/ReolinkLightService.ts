@@ -27,7 +27,7 @@ interface ActiveLight {
 export class ReolinkLightService {
     readonly #lights = new Map<string, ActiveLight>();
 
-    /** Returns true when GetWhiteLed succeeds for the camera channel. */
+    /** Returns true when WhiteLed hardware responds to an active on/off probe. */
     async probeCapability(camera: Camera): Promise<boolean> {
         const target = resolveReolinkTarget(camera);
         if (!target) return false;
@@ -39,7 +39,13 @@ export class ReolinkLightService {
 
         try {
             await client.ensureAuth();
-            return (await client.getWhiteLedState(target.channel)) !== null;
+            const verified = await client.verifyWhiteLedControl(target.channel);
+            if (!verified) {
+                logger.info(
+                    `Reolink light hardware probe failed camera=${camera.id} host=${target.host} ch=${target.channel}`,
+                );
+            }
+            return verified;
         } catch (error) {
             logger.debug(`Reolink light capability probe failed camera=${camera.id}: ${error}`);
             return false;
@@ -126,10 +132,18 @@ export class ReolinkLightService {
         active.applying = true;
         try {
             const ok = await active.client.setWhiteLed(active.channel, on, active.brightness);
-            if (ok) {
-                this.#sync(active, on, active.brightness);
+            if (!ok) return false;
+
+            if (on) {
+                const confirmed = await active.client.waitWhiteLedState(active.channel, true);
+                if (!confirmed) {
+                    logger.warn(`Reolink light on not reflected by hardware camera=${cameraId}`);
+                    return false;
+                }
             }
-            return ok;
+
+            this.#sync(active, on, active.brightness);
+            return true;
         } finally {
             active.applying = false;
         }

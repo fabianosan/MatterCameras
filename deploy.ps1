@@ -1,10 +1,9 @@
 $ErrorActionPreference = 'Stop'
 
 $root = Split-Path -Parent $MyInvocation.MyCommand.Path
+. (Join-Path $root 'scripts/resolve-deploy-bash.ps1')
 
-if (-not (Get-Command bash -ErrorAction SilentlyContinue)) {
-    Write-Error 'bash not found in PATH. Install Git for Windows and use a shell with bash, rsync, and ssh available.'
-}
-
-& bash "$root/scripts/deploy.sh" @args
+$bash = Get-DeployBash
+$bashArgs = @((Join-Path $root 'scripts/deploy-windows.sh'), 'full') + $args
+& $bash @bashArgs
 exit $LASTEXITCODE

@@ -23,12 +23,13 @@ import {
     logoutProtect,
 } from '../cameraProviders/unifi/protectApi.js';
 import { patchCameraFromProtect, syncExistingProtectCameras } from '../cameraProviders/unifi/syncExisting.js';
-import { installCamera, refreshCameraRuntime } from './cameraInstall.js';
+import { installCamera, refreshCameraRuntime, syncReolinkLightCapability } from './cameraInstall.js';
 import { markBridgeRestartRequired } from './bridgeRestartState.js';
 import { bridgeRestartingPageHtml } from './bridgeRestartingPage.js';
 import { parseCameraMotionFields, parseMotionSource } from '../motion/parseMotionForm.js';
 import { setBridgeEndpointCount } from '../config/version.js';
 import { countBridgedEndpoints } from '../matter/personSensorConfig.js';
+import { canCameraExposeReolinkLight } from '../matter/reolinkLightConfig.js';
 
 const app = express();
 const port = appConfig.webPort;
@@ -75,6 +76,13 @@ function resolveReturnToPath(raw: unknown): string {
 
 // Routes
 app.get('/', async (req, res) => {
+    const needsReolinkProbe = storage.getCameras().filter(
+        cam => canCameraExposeReolinkLight(cam) && cam.reolinkLightCapable === undefined,
+    );
+    if (needsReolinkProbe.length > 0) {
+        await Promise.all(needsReolinkProbe.map(cam => syncReolinkLightCapability(cam)));
+    }
+
     const cameras = storage.getCameras().map(sanitizeCameraForPublic);
     const pairingInfo = await bridge.getPairingInfo();
     const bridgeStatus = getBridgeStatus();
@@ -507,7 +515,6 @@ app.post('/api/cameras/:id/duplicate', async (req, res) => {
         rtspUrl: existing.rtspUrl,
         codec: existing.codec,
         motionSource: existing.motionSource ?? 'frame-diff',
-        motionObjectType: existing.motionObjectType ?? 'any',
         personSensorEnabled: existing.personSensorEnabled ?? false,
         reolinkLightEnabled: existing.reolinkLightEnabled ?? false,
         onvifUrl: existing.onvifUrl,

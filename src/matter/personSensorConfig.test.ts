@@ -2,10 +2,12 @@ import assert from 'node:assert/strict';
 import type { Camera } from '../types/index.js';
 import {
     baseCameraIdFromPersonSensorId,
+    buildCameraMotionCamera,
     buildPersonSensorMotionCamera,
     canCameraExposePersonSensor,
     countBridgedEndpoints,
     expectedBridgedEndpointIds,
+    finalizeCameraMotionSettings,
     isPersonSensorEndpointId,
     personSensorEndpointId,
     personSensorLabel,
@@ -36,6 +38,37 @@ assert.deepEqual(buildPersonSensorMotionCamera(reolinkCamera), {
     motionSource: 'auto',
     motionObjectType: 'person',
     personSensorEnabled: false,
+});
+
+assert.deepEqual(buildCameraMotionCamera({
+    ...reolinkCamera,
+    motionObjectType: 'person',
+}), {
+    ...reolinkCamera,
+    motionObjectType: 'any',
+});
+
+assert.deepEqual(finalizeCameraMotionSettings({
+    ...reolinkCamera,
+    motionObjectType: 'person',
+    personSensorEnabled: false,
+}), {
+    ...reolinkCamera,
+    motionObjectType: 'any',
+    personSensorEnabled: true,
+    reolinkLightEnabled: false,
+});
+
+assert.deepEqual(finalizeCameraMotionSettings({
+    ...reolinkCamera,
+    reolinkLightEnabled: true,
+    reolinkLightCapable: false,
+}), {
+    ...reolinkCamera,
+    motionObjectType: 'any',
+    personSensorEnabled: true,
+    reolinkLightEnabled: false,
+    reolinkLightCapable: false,
 });
 
 {

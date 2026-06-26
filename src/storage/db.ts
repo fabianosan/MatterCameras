@@ -2,6 +2,7 @@ import { Low } from 'lowdb';
 import { JSONFile } from 'lowdb/node';
 import { Camera } from '../types/index.js';
 import { DB_FILE } from '../config/paths.js';
+import { finalizeCameraMotionSettings } from '../matter/personSensorConfig.js';
 import fs from 'fs';
 import path from 'path';
 
@@ -53,7 +54,7 @@ export class StorageService {
 
     async addCamera(camera: Camera): Promise<void> {
         await this.reload();
-        this.db.data.cameras.push(cloneCamera(camera));
+        this.db.data.cameras.push(cloneCamera(finalizeCameraMotionSettings(camera)));
         await this.db.write();
     }
 
@@ -83,6 +84,13 @@ export class StorageService {
         if (updates.motionObjectType !== undefined) camera.motionObjectType = updates.motionObjectType;
         if (updates.personSensorEnabled !== undefined) camera.personSensorEnabled = updates.personSensorEnabled;
         if (updates.reolinkLightEnabled !== undefined) camera.reolinkLightEnabled = updates.reolinkLightEnabled;
+        if ('reolinkLightCapable' in updates) {
+            if (updates.reolinkLightCapable === undefined) {
+                delete camera.reolinkLightCapable;
+            } else {
+                camera.reolinkLightCapable = updates.reolinkLightCapable;
+            }
+        }
         if (updates.onvifUrl !== undefined) camera.onvifUrl = updates.onvifUrl;
         if (updates.username !== undefined) camera.username = updates.username;
         if (updates.password !== undefined) camera.password = updates.password;
@@ -101,10 +109,11 @@ export class StorageService {
         if (updates.protectCameraId !== undefined) camera.protectCameraId = updates.protectCameraId;
         if (updates.addSource !== undefined) camera.addSource = updates.addSource;
 
-        this.db.data.cameras[index] = camera;
+        const normalized = finalizeCameraMotionSettings(camera);
+        this.db.data.cameras[index] = normalized;
 
         await this.db.write();
-        return cloneCamera(camera);
+        return cloneCamera(normalized);
     }
 }
 

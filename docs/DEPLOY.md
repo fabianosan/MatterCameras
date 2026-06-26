@@ -10,11 +10,21 @@ Remote deployment to a dedicated bridge host (e.g. mini PC on the camera VLAN). 
 
 ### Windows workstation
 
-If you deploy from Windows, install **Git for Windows** and use a shell that provides:
+On **Windows** (especially **ARM64** PCs), use the root **PowerShell** wrappers (`.ps1`) or `.cmd` shortcuts. They sync files with **Git `tar` + OpenSSH** instead of `rsync`, because MSYS2/Cygwin `rsync` builds often crash on ARM Windows when launched from Git Bash.
 
-- `bash`
-- `rsync`
-- `ssh`
+| Tool | Typical install |
+|------|-----------------|
+| `bash` | [Git for Windows](https://git-scm.com/download/win) (remote Docker step only) |
+| `tar` | Included with Git for Windows (`Git\usr\bin\tar.exe`) |
+| `ssh` / `scp` | Windows OpenSSH or Git for Windows |
+
+Linux/macOS maintainers still use `rsync` via `scripts/deploy.sh`.
+
+**Do not rely on WSL `bash.exe`** in PowerShell — it often appears first in `PATH` and fails when WSL mount/state is broken.
+
+Deploy scripts reuse one SSH connection when **Git for Windows** `ssh` is used (multiplexing). The built-in **Windows OpenSSH** client does not support this — install [Git for Windows](https://git-scm.com/download/win) if you see `getsockname failed: Not a socket`.
+
+For passwordless deploy, add your SSH public key to the bridge host (`ssh-copy-id`).
 
 Preferred option: use the root **PowerShell** wrappers (`.ps1`).
 
