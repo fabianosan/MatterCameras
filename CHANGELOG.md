@@ -2,10 +2,6 @@
 
 All notable changes to **Matter Cameras Bridge** are documented here ([Keep a Changelog](https://keepachangelog.com/), [SemVer](https://semver.org/)).
 
-**Agent note:** This file is **date-stamped release notes only** — no architecture overview. System context: `README.md`, `docs/INSTALL.md`, `docs/MATTER-CAMERA.md`, `docs/AGENT-CONTEXT.md` (local). Public install scripts: `scripts/setup.sh`, `scripts/self-update.sh`. On release: move `[Unreleased]` → `[X.Y.Z] — YYYY-MM-DD`, run `npm run release`, tag `vX.Y.Z`, publish a [GitHub Release](https://github.com/patricktd/MatterCameras/releases).
-
-Repository: [github.com/patricktd/MatterCameras](https://github.com/patricktd/MatterCameras) — pre-1.0 **beta**.
-
 ---
 
 ## [Unreleased]
