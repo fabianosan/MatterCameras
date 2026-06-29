@@ -8,6 +8,14 @@ All notable changes to **Matter Cameras Bridge** are documented here ([Keep a Ch
 
 ---
 
+## [0.4.1-beta] — 2026-06-29
+
+### Fixed
+
+- GitHub release check now includes prerelease tags (e.g. `0.4.0-beta`); `/releases/latest` ignored them before.
+
+---
+
 ## [0.4.0-beta] — 2026-06-29
 
 First public beta under the **Matter Cameras Bridge** name.
@@ -117,7 +125,8 @@ First public beta under the **Matter Cameras Bridge** name.
 
 ---
 
-[Unreleased]: https://github.com/patricktd/MatterCameras/compare/v0.4.0-beta...HEAD
+[Unreleased]: https://github.com/patricktd/MatterCameras/compare/v0.4.1-beta...HEAD
+[0.4.1-beta]: https://github.com/patricktd/MatterCameras/releases/tag/v0.4.1-beta
 [0.4.0-beta]: https://github.com/patricktd/MatterCameras/releases/tag/v0.4.0-beta
 [0.3.0-beta]: https://github.com/patricktd/MatterCameras/compare/v0.2.0...v0.3.0-beta
 [0.2.0]: https://github.com/patricktd/MatterCameras/compare/v0.1.0...v0.2.0

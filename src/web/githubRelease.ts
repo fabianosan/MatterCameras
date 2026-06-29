@@ -1,4 +1,4 @@
-import { isNewerVersion } from '../utils/compareVersions.js';
+import { compareVersions, isNewerVersion } from '../utils/compareVersions.js';
 
 const GITHUB_REPO = 'patricktd/MatterCameras';
 const CACHE_TTL_MS = 60 * 60 * 1000;
@@ -8,6 +8,7 @@ interface GitHubRelease {
     html_url: string;
     body: string;
     published_at: string;
+    draft: boolean;
 }
 
 interface CachedRelease {
@@ -22,18 +23,38 @@ function normalizeTag(tag: string): string {
     return tag.trim().replace(/^v/i, '');
 }
 
+function pickLatestRelease(releases: GitHubRelease[]): GitHubRelease | null {
+    const published = releases.filter((release) => !release.draft && release.tag_name);
+    if (published.length === 0) {
+        return null;
+    }
+
+    return published.reduce((latest, candidate) => {
+        try {
+            return compareVersions(normalizeTag(candidate.tag_name), normalizeTag(latest.tag_name)) > 0
+                ? candidate
+                : latest;
+        } catch {
+            return latest;
+        }
+    });
+}
+
 async function fetchLatestRelease(): Promise<CachedRelease> {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 12_000);
 
     try {
-        const response = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/releases/latest`, {
-            headers: {
-                Accept: 'application/vnd.github+json',
-                'User-Agent': 'Matter-Cameras-Bridge',
+        const response = await fetch(
+            `https://api.github.com/repos/${GITHUB_REPO}/releases?per_page=30`,
+            {
+                headers: {
+                    Accept: 'application/vnd.github+json',
+                    'User-Agent': 'Matter-Cameras-Bridge',
+                },
+                signal: controller.signal,
             },
-            signal: controller.signal,
-        });
+        );
 
         if (!response.ok) {
             return {
@@ -45,7 +66,16 @@ async function fetchLatestRelease(): Promise<CachedRelease> {
             };
         }
 
-        const release = await response.json() as GitHubRelease;
+        const releases = await response.json() as GitHubRelease[];
+        const release = pickLatestRelease(releases);
+        if (!release) {
+            return {
+                fetchedAt: Date.now(),
+                release: null,
+                error: 'No GitHub releases published yet.',
+            };
+        }
+
         return { fetchedAt: Date.now(), release, error: null };
     } catch (error) {
         return {
