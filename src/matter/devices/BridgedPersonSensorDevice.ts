@@ -21,7 +21,7 @@ export function bridgedPersonSensorOptions(camera: Camera) {
         bridgedDeviceBasicInformation: {
             nodeLabel: name,
             reachable: true,
-            vendorName: 'MatterCameras',
+            vendorName: camera.manufacturer?.trim() || 'Presence',
             productName: 'Presence Sensor',
             serialNumber: id,
             uniqueId: bridgedUniqueId(id, camera.matterBindEpoch),

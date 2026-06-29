@@ -1,3 +1,64 @@
+async function initSoftwareUpdates() {
+    const statusEl = document.getElementById('software-update-status');
+    const actionsEl = document.getElementById('software-update-actions');
+    const applyBtn = document.getElementById('options-apply-update-btn');
+    const releaseLink = document.getElementById('options-release-link');
+    const hintEl = document.getElementById('self-update-hint');
+
+    if (!statusEl) return;
+
+    try {
+        const response = await fetch('/api/updates', { cache: 'no-store' });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || response.statusText);
+
+        actionsEl?.removeAttribute('hidden');
+        releaseLink?.removeAttribute('hidden');
+        if (data.releaseUrl && releaseLink) releaseLink.href = data.releaseUrl;
+
+        if (data.updateInProgress) {
+            statusEl.textContent = 'An update is in progress. The bridge will restart shortly.';
+            return;
+        }
+
+        if (data.updateAvailable && data.latestVersion) {
+            statusEl.textContent = `v${data.latestVersion} is available (running v${data.currentVersion}).`;
+            if (data.canAutoUpdate && applyBtn) {
+                applyBtn.hidden = false;
+                applyBtn.onclick = async () => {
+                    if (!confirm(`Install v${data.latestVersion} now? The bridge will restart.`)) return;
+                    applyBtn.disabled = true;
+                    try {
+                        const applyResponse = await fetch('/api/updates/apply', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ version: data.latestVersion }),
+                        });
+                        const payload = await applyResponse.json();
+                        if (!applyResponse.ok) throw new Error(payload.error || applyResponse.statusText);
+                        statusEl.textContent = 'Update started. Waiting for restart…';
+                        applyBtn.hidden = true;
+                    } catch (err) {
+                        statusEl.textContent = `Update failed: ${err.message}`;
+                        applyBtn.disabled = false;
+                    }
+                };
+            } else if (hintEl) {
+                hintEl.hidden = false;
+                statusEl.textContent += ' Enable one-click update below, or follow the manual steps in the release notes.';
+            }
+            return;
+        }
+
+        statusEl.textContent = `You are on the latest release (v${data.currentVersion}).`;
+        if (data.checkError) {
+            statusEl.textContent += ` Could not reach GitHub: ${data.checkError}`;
+        }
+    } catch (err) {
+        statusEl.textContent = `Could not check for updates: ${err.message}`;
+    }
+}
+
 function initProtectControllerOptions() {
     const statusEl = document.getElementById('protect-controller-status');
     const saveBtn = document.getElementById('save-protect-controller-btn');
@@ -56,5 +117,6 @@ function initProtectControllerOptions() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+    initSoftwareUpdates();
     initProtectControllerOptions();
 });

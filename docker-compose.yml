@@ -1,4 +1,4 @@
-# MatterCameras — server deploy (host network for mDNS/Matter)
+# Matter Cameras Bridge — server deploy (host network for mDNS/Matter)
 #
 # Host ports (check for conflicts with other apps):
 #   3202  — Web UI

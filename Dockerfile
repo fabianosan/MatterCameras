@@ -1,6 +1,6 @@
 FROM node:22-alpine
 
-RUN apk add --no-cache python3 make g++ gcc tzdata
+RUN apk add --no-cache python3 make g++ gcc tzdata git docker-cli docker-cli-compose
 
 WORKDIR /app
 

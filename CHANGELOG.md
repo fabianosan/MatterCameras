@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to **MatterCameras** are documented in this file.
+All notable changes to **Matter Cameras Bridge** are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
@@ -12,7 +12,7 @@ Repository: [github.com/patricktd/MatterCameras](https://github.com/patricktd/Ma
 
 ## System overview
 
-**MatterCameras** is a bridge that exposes RTSP/ONVIF cameras as **Matter 1.5 Camera** devices (type `0x0142`) on any Matter 1.5–capable hub or controller. **SmartThings** is the primary reference platform today; other ecosystems are supported at the Matter protocol level as they add camera support.
+**Matter Cameras Bridge** is a Matter-compatible bridge that exposes RTSP/ONVIF cameras as **Matter 1.5 Camera** devices (type `0x0142`) on any Matter 1.5–capable hub or controller. It is not a Matter-certified product. **SmartThings** is the primary reference platform today; other ecosystems are supported at the Matter protocol level as they add camera support.
 
 ### Data flow
 
@@ -61,7 +61,12 @@ See [docs/SCALING.md](docs/SCALING.md) for hardware recommendations, camera coun
 
 ## [Unreleased]
 
+### Added
+- **Software update notifications** — Web UI compares the running version with the latest [GitHub Release](https://github.com/patricktd/MatterCameras/releases) and shows a banner when a newer version is available.
+- **One-click self-update (optional)** — with `docker-compose.update.yml`, the dashboard can run `scripts/self-update.sh` (git checkout release tag, `npm ci`, rebuild containers). Camera roster and Matter pairing under `data/` are preserved.
+
 ### Changed
+- **Project display name** — rebranded to **Matter Cameras Bridge** (Matter-compatible bridge, not a Matter-certified product). Web UI shows a CSA trademark disclaimer; hub product name updated. GitHub repository path `MatterCameras` unchanged.
 - **Documentation** — README, install guide, Matter feature docs, scaling, and Web UI copy now describe Matter hubs generically; SmartThings remains documented as the reference platform where behavior is hub-specific.
 - **Release versioning** — `npm run deploy` and `npm run quick-deploy` no longer auto-bump `package.json`. Use `npm run release` (patch), `release:minor`, or `release:major` when publishing to the community; update `CHANGELOG.md` and tag the release before deploy.
 - **Mechanical PTZ exposure** — the Matter PTZ cluster is advertised only after a successful capability probe (`ptzCapable: true`). UniFi Protect cameras are excluded. Endpoints that no longer qualify are recreated without PTZ on bridge startup (hub may still need **Recycle Matter binding** on fixed cameras to refresh SmartThings).

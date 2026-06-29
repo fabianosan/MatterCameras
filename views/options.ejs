@@ -8,7 +8,7 @@
             events. Card motion icons and routines share the same signal.
         </p>
         <p class="field-hint">
-            After hub firmware or driver updates, open <strong>MatterCameras Bridge</strong> in your hub app and
+            After hub firmware or driver updates, open <strong>Matter Cameras Bridge</strong> in your hub app and
             pull down to refresh so cameras re-profile.
         </p>
     </div>
@@ -35,6 +35,30 @@
             <button type="button" class="btn btn-ghost btn-sm" id="clear-protect-controller-btn">Clear saved login</button>
         </div>
         <p id="protect-controller-status" class="field-hint"></p>
+    </div>
+
+    <div class="card options-page" id="software-updates-card">
+        <h2>Software updates</h2>
+        <p class="field-hint" style="margin-top: 0;">
+            The bridge checks <a href="https://github.com/patricktd/MatterCameras/releases" target="_blank" rel="noopener noreferrer">GitHub Releases</a>
+            for newer versions. Your camera list and Matter pairing are kept during an update.
+        </p>
+        <p id="software-update-status" class="field-hint">Checking for updates…</p>
+        <div class="options-actions" id="software-update-actions" hidden>
+            <button type="button" class="btn btn-sm" id="options-apply-update-btn" hidden>Update now</button>
+            <a class="btn btn-ghost btn-sm" id="options-release-link" href="https://github.com/patricktd/MatterCameras/releases" target="_blank" rel="noopener noreferrer" hidden>Release notes</a>
+        </div>
+        <details class="field-hint" id="self-update-hint" hidden>
+            <summary>Enable one-click update (Docker)</summary>
+            <p style="margin-top: 0.5rem;">
+                From your git checkout on the host:
+            </p>
+            <pre class="code-block">docker compose -f docker-compose.yml -f docker-compose.update.yml up -d</pre>
+            <p>
+                This mounts the repository and Docker socket so the Web UI can run
+                <code>scripts/self-update.sh</code>. Use only on a trusted LAN — the dashboard has no login.
+            </p>
+        </details>
     </div>
 
     <div class="card options-page">

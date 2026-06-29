@@ -111,7 +111,7 @@ EOF
 
 lan_ip="$(detect_lan_ip)"
 
-echo "==> MatterCameras setup"
+echo "==> Matter Cameras Bridge setup"
 echo "    LAN IP (matterHost / WebRTC): ${lan_ip}"
 echo ""
 

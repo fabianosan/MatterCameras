@@ -23,7 +23,7 @@ export function bridgedReolinkLightOptions(camera: Camera) {
         bridgedDeviceBasicInformation: {
             nodeLabel: name,
             reachable: true,
-            vendorName: 'MatterCameras',
+            vendorName: camera.manufacturer?.trim() || 'Reolink',
             productName: 'Light',
             serialNumber: id,
             uniqueId: bridgedUniqueId(id, camera.matterBindEpoch),

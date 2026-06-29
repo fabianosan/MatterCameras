@@ -1,16 +1,18 @@
-# MatterCameras
+# Matter Cameras Bridge
 
 > **Beta (pre-1.0)** — version is set in `package.json` and bumped only on release (`npm run release`). Verify with `curl http://<host>:3202/api/version`.
 
-Bridge RTSP/ONVIF cameras into **Matter 1.5 Camera** devices for any Matter 1.5–capable hub or controller (SmartThings, Google Home, Apple Home, and others as they add camera support).
+**Matter-compatible bridge** that exposes RTSP/ONVIF cameras as **Matter 1.5 Camera** endpoints on any Matter 1.5–capable hub or controller (SmartThings, Google Home, Apple Home, and others as they add camera support). This is **not** a Matter-certified product.
+
+> **Trademark notice:** Matter is a trademark of the [Connectivity Standards Alliance](https://csa-iot.org/). Matter Cameras Bridge is an independent open-source project — **not affiliated with the CSA** and **not** a Matter-certified device. It works with Matter; it is not a Matter product.
 
 ## Architecture
 
 ```
-RTSP/ONVIF → go2rtc (WebRTC) → Matter Bridge (matter.js 0.17) → Matter hub / controller
+RTSP/ONVIF → go2rtc (WebRTC) → Matter-compatible bridge (matter.js 0.17) → Matter hub / controller
 ```
 
-- **Matter bridge** — bridged `Camera` endpoints (type `0x0142`) with AV Stream + WebRTC clusters
+- **Bridge** — bridged `Camera` endpoints (type `0x0142`) with AV Stream + WebRTC clusters
 - **go2rtc** — RTSP ingest and WebRTC SDP exchange
 - **Web UI** — add/remove cameras, Matter pairing QR, motion sensitivity
 
@@ -89,4 +91,4 @@ App-only on host: `./scripts/setup.sh --dev` and `docker compose up -d go2rtc`.
 
 ## Repository
 
-https://github.com/patricktd/MatterCameras
+Source code: [github.com/patricktd/MatterCameras](https://github.com/patricktd/MatterCameras) (repository folder name unchanged).

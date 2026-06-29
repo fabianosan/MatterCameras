@@ -144,7 +144,7 @@ curl -s "http://${DEPLOY_HOST}:3202/api/version"
 grep '"version"' package.json   # must match
 ```
 
-Startup log: `Starting MatterCameras vX.Y.Z-beta...`
+Startup log: `Starting Matter Cameras Bridge vX.Y.Z-beta...`
 
 `docker-compose.yml` bind-mounts `./dist` so the app container picks up JS without an image rebuild.
 

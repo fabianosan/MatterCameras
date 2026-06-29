@@ -1,6 +1,6 @@
 # Scaling limits and recommendations
 
-Reference for anyone deploying or operating the MatterCameras bridge in production.
+Reference for anyone deploying or operating the Matter Cameras Bridge in production.
 
 ## Ecosystem limits
 

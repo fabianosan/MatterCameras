@@ -303,6 +303,62 @@ a.btn-ghost:visited {
     color: #9a3412;
 }
 
+.brand-disclaimer {
+    margin: -12px 0 24px;
+    padding: 10px 14px;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.72);
+    border: 1px solid var(--border-color);
+    color: var(--text-secondary);
+    font-size: 0.78rem;
+    line-height: 1.45;
+}
+
+.brand-disclaimer strong {
+    color: var(--text-primary);
+    font-weight: 600;
+}
+
+.update-banner {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-bottom: 24px;
+    padding: 12px 16px;
+    border-radius: 8px;
+    background: #ecfdf5;
+    border: 1px solid #86efac;
+    color: #14532d;
+    font-size: 0.9rem;
+}
+
+.update-banner a {
+    color: #166534;
+    font-weight: 600;
+}
+
+.update-banner__actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.update-banner__status {
+    font-weight: 600;
+}
+
+.code-block {
+    display: block;
+    padding: 10px 12px;
+    border-radius: 8px;
+    background: #0f172a;
+    color: #e2e8f0;
+    font-size: 0.82rem;
+    overflow-x: auto;
+}
+
 .onvif-discovery {
     margin: 16px 0;
     padding: 12px;

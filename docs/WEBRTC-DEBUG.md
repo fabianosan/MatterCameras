@@ -1,6 +1,6 @@
 # WebRTC live view debugging (Matter)
 
-Bridge: **MatterCameras** on `192.168.1.50` → Matter hub via Matter 1.5 Camera (`0x0142`). Test logs below use **SmartThings** as the reference hub.
+Bridge: **Matter Cameras Bridge** on `192.168.1.50` → Matter hub via Matter 1.5 Camera (`0x0142`). Test logs below use **SmartThings** as the reference hub.
 
 ## Current status (2026-06-09)
 

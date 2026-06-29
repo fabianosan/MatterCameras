@@ -92,7 +92,7 @@ function installStaleFabricRecoveryHooks() {
 }
 
 async function main() {
-    console.log(`Starting MatterCameras v${appVersion}...`);
+    console.log(`Starting Matter Cameras Bridge v${appVersion}...`);
     console.log(`Matter host: ${appConfig.matterHost}:${appConfig.matterPort}`);
     console.log(`Web UI: http://0.0.0.0:${appConfig.webPort}`);
     console.log(`go2rtc: ${appConfig.go2rtcUrl}`);

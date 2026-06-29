@@ -57,7 +57,7 @@ quick_sync_bundled() {
 
 case "${MODE}" in
     full)
-        echo "==> Deploy MatterCameras v${DEPLOY_VERSION} → ${REMOTE}:${DEST} (Windows tar+ssh)"
+        echo "==> Deploy Matter Cameras Bridge v${DEPLOY_VERSION} → ${REMOTE}:${DEST} (Windows tar+ssh)"
         tar_stream_sync "${ROOT}" "${DEST}" \
             node_modules dist .git .DS_Store '._*' \
             data/matter-storage data/cameras.json data/config.json \
@@ -70,7 +70,7 @@ case "${MODE}" in
         recreate_and_tar_sync "${ROOT}/dist" "${DEST}/dist" test .DS_Store '._*'
         ;;
     quick)
-        echo "==> Quick deploy MatterCameras v${DEPLOY_VERSION} → ${REMOTE}:${DEST} (Windows tar+ssh)"
+        echo "==> Quick deploy Matter Cameras Bridge v${DEPLOY_VERSION} → ${REMOTE}:${DEST} (Windows tar+ssh)"
         if [ ! -d "${ROOT}/dist" ]; then
             echo "ERROR: ${ROOT}/dist not found. Run 'npm run build' first." >&2
             exit 1

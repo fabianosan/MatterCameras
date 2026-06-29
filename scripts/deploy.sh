@@ -35,7 +35,7 @@ if [ ! -d "${ROOT}/dist" ]; then
 fi
 
 DEPLOY_VERSION="$(node -e "const fs=require('fs'); const path=require('path'); const root=process.argv[1]; const pkg=JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8')); console.log(pkg.version);" "${ROOT_NODE}")"
-echo "==> Deploy MatterCameras v${DEPLOY_VERSION} → ${USER}@${HOST}:${DEST}"
+echo "==> Deploy Matter Cameras Bridge v${DEPLOY_VERSION} → ${USER}@${HOST}:${DEST}"
 
 export RSYNC_RSH="${DEPLOY_RSYNC_RSH}"
 

@@ -7,14 +7,14 @@ brand-specific motion provider architecture.
 
 Production camera mix (operator):
 
-| Brand | Role today | Motion path in MatterCameras today |
+| Brand | Role today | Motion path in Matter Cameras Bridge today |
 |-------|------------|-------------------------------------|
 | **UniFi Protect** | RTSP from Protect NVR/cameras | `frame-diff` or generic ONVIF (if exposed) |
 | **Reolink** | Direct RTSP | `frame-diff` or generic ONVIF |
 | **Tapo** | RTSP via Camera Account | `onvif` (PullPoint) when firmware allows |
 | **Sonoff / generic ONVIF** | ONVIF discovery | `onvif` (PullPoint) |
 
-Goal: make MatterCameras **scalable** (more brands, more cameras, lower CPU) without
+Goal: make Matter Cameras Bridge **scalable** (more brands, more cameras, lower CPU) without
 adopting Scrypted's full RPC/plugin runtime.
 
 ---
@@ -53,7 +53,7 @@ analysis last.
 - `src/camera.ts` — `MotionSensor`, `ObjectDetector`
 - `src/camera-sensors.ts` — debounce timers
 
-**Port to MatterCameras:** thin `ProtectEventClient` (~200 lines): login, subscribe WS,
+**Port to Matter Cameras Bridge:** thin `ProtectEventClient` (~200 lines): login, subscribe WS,
 map `motion` → Matter `ZoneTriggered`. Optional: filter occupancy on `person` only via
 smart detect types. Requires Protect controller IP + local user credentials (not cloud).
 
@@ -93,7 +93,7 @@ POST      [{ "cmd": "GetEvents", "param": { "channel": N } }]   # battery / PIR 
 | `FaceDetect` | face |
 | `Package` | package |
 
-**Port to MatterCameras:** `ReolinkMotionProvider` — prefer native polling when
+**Port to Matter Cameras Bridge:** `ReolinkMotionProvider` — prefer native polling when
 manufacturer/model matches; ONVIF as fallback. Poll **both** `GetMdState` and `GetAiState`
 (Reolink AI may suppress raw motion when objects are detected).
 
@@ -115,7 +115,7 @@ Reolink cameras on one node.
 
 **Typical ONVIF topics:** `RuleEngine/CellMotionDetector/Motion`, `MotionAlarm`
 
-**Port to MatterCameras:** no Tapo-specific provider for motion. Improve generic ONVIF
+**Port to Matter Cameras Bridge:** no Tapo-specific provider for motion. Improve generic ONVIF
 provider with Tapo ops docs + CellMotion debounce (see below). Optional future: HTTP
 webhook ingress if PullPoint fails on a model.
 
@@ -142,7 +142,7 @@ webhook ingress if PullPoint fails on a model.
 | `RuleEngine/ObjectDetector` | Class name from firmware (`Human`, `Vehicle`, …) |
 | `Visitor` | Binary doorbell event |
 
-**MatterCameras today (`src/onvif/`):**
+**Matter Cameras Bridge today (`src/onvif/`):**
 
 | Feature | Status |
 |---------|--------|
@@ -191,7 +191,7 @@ Example rules:
 
 ## Scalability architecture (target)
 
-MatterCameras must scale along **three axes**: more cameras per node, more brands, and
+Matter Cameras Bridge must scale along **three axes**: more cameras per node, more brands, and
 (optionally) multiple bridge nodes.
 
 ### Axis 1 — Motion provider registry (in-process)
@@ -237,7 +237,7 @@ On failure: log, try next in chain (same as today's ONVIF → frame-diff).
 
 ### Axis 2 — Shared connections (already started)
 
-| Resource | Sharing unit | MatterCameras |
+| Resource | Sharing unit | Matter Cameras Bridge |
 |----------|--------------|---------------|
 | ONVIF PullPoint | per `host:port:path` | ✅ `motionSubscriptionHub` |
 | UniFi Protect WS | per controller IP | 🔲 one `ProtectHub` (phase 3) |
@@ -300,7 +300,7 @@ Backward compatible: `motionSource: onvif` maps to `motionProvider: onvif`.
 
 ## Gap summary vs Scrypted
 
-| Capability | Scrypted | MatterCameras now | Phase |
+| Capability | Scrypted | Matter Cameras Bridge now | Phase |
 |------------|----------|-------------------|-------|
 | UniFi WS motion | ✅ | ❌ | 3b |
 | Reolink api.cgi | ✅ | ❌ | 3a |
@@ -392,5 +392,5 @@ Backward compatible: `motionSource: onvif` maps to `motionProvider: onvif`.
 - Scrypted ONVIF plugin: `plugins/onvif/src/onvif-api.ts`, `onvif-events.ts`
 - Scrypted Reolink: `plugins/reolink/src/reolink-api.ts`
 - Scrypted UniFi: `plugins/unifi-protect/src/main.ts`
-- MatterCameras scaling: `docs/SCALING.md`
-- MatterCameras ONVIF: `docs/MATTER-CAMERA.md` and `docs/INSTALL.md`
+- Matter Cameras Bridge scaling: `docs/SCALING.md`
+- Matter Cameras Bridge ONVIF: `docs/MATTER-CAMERA.md` and `docs/INSTALL.md`

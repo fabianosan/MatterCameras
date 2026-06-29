@@ -1,6 +1,8 @@
 # Installation guide (testers)
 
-Step-by-step setup for trying **MatterCameras** on your own LAN with a Matter 1.5 camera–capable hub.
+Step-by-step setup for trying **Matter Cameras Bridge** on your own LAN with a Matter 1.5 camera–capable hub.
+
+> **Trademark notice:** Matter is a trademark of the Connectivity Standards Alliance. This project is an independent Matter-compatible bridge — not affiliated with the CSA and not a Matter-certified product.
 
 ## What you need
 
@@ -31,6 +33,30 @@ The script:
 4. Builds and starts **go2rtc** + **app** with `network_mode: host`
 
 Open the Web UI at `http://<your-lan-ip>:3202`.
+
+### Software updates
+
+The dashboard checks [GitHub Releases](https://github.com/patricktd/MatterCameras/releases) and shows a banner when a newer version is published.
+
+**Manual update** (any install):
+
+```bash
+cd MatterCameras
+git fetch --tags origin
+git checkout v0.4.0-beta   # or: git pull --ff-only origin main
+npm ci && npm run build
+docker compose up --build -d
+```
+
+Or run `bash scripts/self-update.sh [version]` from the project root.
+
+**One-click update from the Web UI** (git clone + Docker on a trusted LAN):
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.update.yml up -d
+```
+
+This mounts the repository and Docker socket so **Options → Software updates** (and the dashboard banner) can apply a release without SSH. `data/cameras.json`, `data/matter-storage/`, and other runtime files are not touched.
 
 ### Ports
 

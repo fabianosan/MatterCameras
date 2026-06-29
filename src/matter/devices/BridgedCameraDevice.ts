@@ -43,7 +43,7 @@ export function bridgedCameraOptions(camera: Camera) {
         bridgedDeviceBasicInformation: {
             nodeLabel: camera.name,
             reachable: true,
-            vendorName: 'MatterCameras',
+            vendorName: camera.manufacturer?.trim() || 'RTSP',
             productName: 'RTSP Camera',
             serialNumber: camera.id,
             uniqueId: bridgedUniqueId(camera.id, camera.matterBindEpoch),

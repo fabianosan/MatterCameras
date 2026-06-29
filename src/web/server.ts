@@ -29,6 +29,8 @@ import { bridgeRestartingPageHtml } from './bridgeRestartingPage.js';
 import { parseCameraMotionFields, parseMotionSource, sanitizeCameraMotionFields } from '../motion/parseMotionForm.js';
 import { setBridgeEndpointCount } from '../config/version.js';
 import { countBridgedEndpoints, expectedBridgedEndpointIds } from '../matter/personSensorConfig.js';
+import { getLatestReleaseInfo } from './githubRelease.js';
+import { getSelfUpdateStatus, isUpdateInProgress, spawnSelfUpdate } from './selfUpdate.js';
 
 const app = express();
 const port = appConfig.webPort;
@@ -148,6 +150,61 @@ app.delete('/api/settings/protect-controller', async (_req, res) => {
 /** Deploy verification — compare with local package.json after quick-deploy. */
 app.get('/api/version', (_req, res) => {
     res.json({ version: appVersion });
+});
+
+/** Compare running version with the latest GitHub release. */
+app.get('/api/updates', async (_req, res) => {
+    try {
+        const release = await getLatestReleaseInfo(appVersion);
+        const { canAutoUpdate } = getSelfUpdateStatus();
+        res.json({
+            ...release,
+            canAutoUpdate,
+            updateInProgress: isUpdateInProgress(),
+        });
+    } catch (error) {
+        res.status(500).json({ error: String(error) });
+    }
+});
+
+/** One-click self-update when docker-compose.update.yml is enabled. */
+app.post('/api/updates/apply', async (req, res) => {
+    if (isUpdateInProgress()) {
+        res.status(409).json({ error: 'Update already in progress.' });
+        return;
+    }
+
+    try {
+        const release = await getLatestReleaseInfo(appVersion);
+        if (!release.updateAvailable || !release.latestVersion) {
+            res.status(400).json({ error: 'No newer release is available.' });
+            return;
+        }
+
+        const targetVersion = String(req.body?.version ?? release.latestVersion).trim();
+        if (targetVersion !== release.latestVersion) {
+            res.status(400).json({ error: 'Requested version does not match the latest release.' });
+            return;
+        }
+
+        const { canAutoUpdate } = getSelfUpdateStatus();
+        if (!canAutoUpdate) {
+            res.status(503).json({
+                error: 'One-click update is not configured on this host.',
+                manualCommand: `cd /path/to/MatterCameras && bash scripts/self-update.sh ${targetVersion}`,
+            });
+            return;
+        }
+
+        spawnSelfUpdate(targetVersion);
+        res.status(202).json({
+            accepted: true,
+            targetVersion,
+            message: 'Update started. The bridge will restart when the new build is ready.',
+        });
+    } catch (error) {
+        res.status(500).json({ error: String(error) });
+    }
 });
 
 app.get('/api/pairing', async (_req, res) => {

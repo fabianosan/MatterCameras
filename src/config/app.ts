@@ -36,9 +36,9 @@ const defaults: AppConfig = {
     },
     vendor: {
         vendorId: Number(process.env.MATTER_VENDOR_ID ?? 0xfff1),
-        vendorName: 'MatterCameras',
+        vendorName: 'patricktd',
         productId: Number(process.env.MATTER_PRODUCT_ID ?? 0x8000),
-        productName: 'MatterCameras Bridge',
+        productName: 'Matter Cameras Bridge',
     },
 };
 

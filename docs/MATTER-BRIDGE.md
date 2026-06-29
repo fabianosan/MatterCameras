@@ -34,7 +34,7 @@ Typical Zigbee/Wi-Fi Matter bridges (lights, plugs):
 3. Bridge updates **Aggregator `PartsList`** and sends an **attribute report** to subscribed hubs.
 4. The hub app shows the new device within seconds — **no bridge reboot**.
 
-## How MatterCameras works
+## How Matter Cameras Bridge works
 
 | Step | Implementation |
 |------|----------------|
@@ -83,7 +83,7 @@ CaptureSnapshot camera=cam-…
 Try:
 
 1. After adding a camera in the Web UI, watch for bridge-side logs such as `Adding bridged camera` and `Bridge structure`.
-2. Open **MatterCameras Bridge** in the hub app → pull down to refresh.
+2. Open **Matter Cameras Bridge** in the hub app → pull down to refresh.
 3. Wait 2–5 minutes for card preview (hub polling).
 4. **Remove and re-pair the bridge** (cameras stay in `data/cameras.json`) — required if the hub paired before those cameras existed.
 5. Use **Restart Required** in the Web UI only as a last resort.
