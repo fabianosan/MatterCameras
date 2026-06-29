@@ -1,9 +1,11 @@
 import { spawn } from 'child_process';
-import { existsSync } from 'fs';
+import { createWriteStream, existsSync } from 'fs';
 import { join } from 'path';
 
 const DOCKER_SOCKET = '/var/run/docker.sock';
 const UPDATE_SCRIPT = 'scripts/self-update.sh';
+const DEFAULT_UPDATE_ROOT = '/project';
+const UPDATE_LOG = '/app/data/self-update.log';
 
 let updateInProgress = false;
 
@@ -11,8 +13,19 @@ export function isUpdateInProgress(): boolean {
     return updateInProgress;
 }
 
+function resolveSelfUpdateRoot(): string {
+    const fromEnv = process.env.MATTER_CAMERAS_SELF_UPDATE_ROOT?.trim();
+    if (fromEnv) {
+        return fromEnv;
+    }
+    if (existsSync(join(DEFAULT_UPDATE_ROOT, UPDATE_SCRIPT))) {
+        return DEFAULT_UPDATE_ROOT;
+    }
+    return '';
+}
+
 export function getSelfUpdateStatus() {
-    const root = process.env.MATTER_CAMERAS_SELF_UPDATE_ROOT?.trim() || '';
+    const root = resolveSelfUpdateRoot();
     const canAutoUpdate = Boolean(
         root &&
         existsSync(join(root, '.git')) &&
@@ -23,6 +36,15 @@ export function getSelfUpdateStatus() {
     return { root, canAutoUpdate };
 }
 
+function resolveBashPath(): string | null {
+    for (const candidate of ['/bin/bash', '/usr/bin/bash']) {
+        if (existsSync(candidate)) {
+            return candidate;
+        }
+    }
+    return null;
+}
+
 export function spawnSelfUpdate(targetVersion: string): void {
     if (updateInProgress) {
         throw new Error('An update is already in progress.');
@@ -31,21 +53,44 @@ export function spawnSelfUpdate(targetVersion: string): void {
     const { root, canAutoUpdate } = getSelfUpdateStatus();
     if (!canAutoUpdate) {
         throw new Error(
-            'One-click update is not enabled. See docs/INSTALL.md — enable docker-compose.update.yml.',
+            'One-click update is not available. Install from a git clone with Docker (see docs/INSTALL.md).',
         );
+    }
+
+    const bash = resolveBashPath();
+    if (!bash) {
+        throw new Error('bash is not available in the app container. Rebuild the Docker image (docker compose build app).');
     }
 
     updateInProgress = true;
 
-    const child = spawn('bash', [UPDATE_SCRIPT, targetVersion], {
+    const scriptPath = join(root, UPDATE_SCRIPT);
+    const logStream = createWriteStream(UPDATE_LOG, { flags: 'a' });
+    logStream.write(`\n==> self-update ${targetVersion} started ${new Date().toISOString()}\n`);
+
+    const child = spawn(bash, [scriptPath, targetVersion], {
         cwd: root,
         detached: true,
-        stdio: 'ignore',
+        stdio: ['ignore', 'pipe', 'pipe'],
         env: process.env,
     });
 
-    child.on('error', () => {
+    child.stdout?.pipe(logStream);
+    child.stderr?.pipe(logStream);
+
+    const finish = (code: number | null, signal: NodeJS.Signals | null) => {
+        logStream.write(`==> self-update exited code=${code ?? 'null'} signal=${signal ?? 'null'}\n`);
+        logStream.end();
         updateInProgress = false;
+    };
+
+    child.on('error', (error) => {
+        logStream.write(`==> self-update spawn error: ${error.message}\n`);
+        finish(null, null);
+    });
+
+    child.on('exit', (code, signal) => {
+        finish(code, signal);
     });
 
     child.unref();

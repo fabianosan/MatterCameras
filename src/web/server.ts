@@ -167,7 +167,7 @@ app.get('/api/updates', async (_req, res) => {
     }
 });
 
-/** One-click self-update when docker-compose.update.yml is enabled. */
+/** One-click self-update from the Web UI (Docker + git checkout). */
 app.post('/api/updates/apply', async (req, res) => {
     if (isUpdateInProgress()) {
         res.status(409).json({ error: 'Update already in progress.' });
@@ -190,8 +190,7 @@ app.post('/api/updates/apply', async (req, res) => {
         const { canAutoUpdate } = getSelfUpdateStatus();
         if (!canAutoUpdate) {
             res.status(503).json({
-                error: 'One-click update is not configured on this host.',
-                manualCommand: `cd /path/to/MatterCameras && bash scripts/self-update.sh ${targetVersion}`,
+                error: 'One-click update is not available on this host. Install from a git clone with Docker (see docs/INSTALL.md).',
             });
             return;
         }

@@ -137,6 +137,12 @@ fi
 command -v docker >/dev/null || { echo "ERROR: Docker required. Install Docker or use --dev." >&2; exit 1; }
 docker compose version >/dev/null 2>&1 || { echo "ERROR: docker compose plugin not found." >&2; exit 1; }
 
+if [[ ! -d .git ]]; then
+  echo "ERROR: Install from a git clone so one-click updates work:" >&2
+  echo "  git clone https://github.com/patricktd/MatterCameras.git" >&2
+  exit 1
+fi
+
 # docker-compose bind-mounts ./dist; compile on the host so a fresh clone is not empty.
 echo "==> Build app (dist/ for Docker bind-mount)"
 command -v node >/dev/null || { echo "ERROR: Node.js 22+ required to build dist/. Install Node or use --dev." >&2; exit 1; }

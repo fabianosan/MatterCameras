@@ -25,15 +25,13 @@
         let action = '';
         if (data.updateInProgress) {
             action = '<span class="update-banner__status">Updating…</span>';
-        } else if (data.canAutoUpdate) {
-            action = `<button type="button" class="btn btn-sm" id="apply-update-btn">Update now</button>`;
         } else {
-            action = `<a class="btn btn-sm btn-secondary" href="${data.releaseUrl}" target="_blank" rel="noopener noreferrer">How to update</a>`;
+            action = `<button type="button" class="btn btn-sm" id="apply-update-btn">Update now</button>`;
         }
 
         banner.innerHTML = `
             <div class="update-banner__text">
-                <strong>Update available:</strong> ${versionLabel} is on GitHub
+                <strong>Update available:</strong> ${versionLabel}
                 (you are on v${data.currentVersion}).
                 ${notesLink}
             </div>

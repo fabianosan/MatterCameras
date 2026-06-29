@@ -39,34 +39,19 @@ Open the Web UI at `http://<your-lan-ip>:3202`.
 
 ### Software updates
 
-The dashboard checks [GitHub Releases](https://github.com/patricktd/MatterCameras/releases) and shows a banner when a newer version is published (requires a published release tag on GitHub).
+Install from a **git clone** (`git clone https://github.com/patricktd/MatterCameras.git`) so the bridge can update itself.
 
-**Manual update** (any install):
+The dashboard checks [GitHub](https://github.com/patricktd/MatterCameras/releases) for newer version tags. When one is available, click **Update now** on the banner or under **Options → Software updates**. The bridge checks out the tag, rebuilds, and restarts Docker — `data/cameras.json`, `data/matter-storage/`, and pairing are preserved.
+
+Requires Docker (default `docker compose up`) on a **trusted LAN** — the Web UI has no login.
+
+**Manual update** (SSH fallback):
 
 ```bash
 cd MatterCameras
-git fetch --tags origin
-git checkout v0.4.0-beta   # or: git pull --ff-only origin main
-npm ci && npm run build
-docker compose up --build -d
+bash scripts/self-update.sh          # latest main
+bash scripts/self-update.sh 0.4.1-beta   # specific tag
 ```
-
-If image rebuild fails (no route to Docker Hub) but you only changed JS/views, try starting without rebuild:
-
-```bash
-npm ci && npm run build
-docker compose up -d
-```
-
-Or run `bash scripts/self-update.sh [version]` from the project root.
-
-**One-click update from the Web UI** (git clone + Docker on a trusted LAN):
-
-```bash
-docker compose -f docker-compose.yml -f docker-compose.update.yml up -d
-```
-
-This mounts the repository and Docker socket so **Options → Software updates** (and the dashboard banner) can apply a release without SSH. `data/cameras.json`, `data/matter-storage/`, and other runtime files are not touched.
 
 ### Ports
 

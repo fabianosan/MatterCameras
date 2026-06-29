@@ -3,7 +3,6 @@ async function initSoftwareUpdates() {
     const actionsEl = document.getElementById('software-update-actions');
     const applyBtn = document.getElementById('options-apply-update-btn');
     const releaseLink = document.getElementById('options-release-link');
-    const hintEl = document.getElementById('self-update-hint');
 
     if (!statusEl) return;
 
@@ -23,7 +22,7 @@ async function initSoftwareUpdates() {
 
         if (data.updateAvailable && data.latestVersion) {
             statusEl.textContent = `v${data.latestVersion} is available (running v${data.currentVersion}).`;
-            if (data.canAutoUpdate && applyBtn) {
+            if (applyBtn) {
                 applyBtn.hidden = false;
                 applyBtn.onclick = async () => {
                     if (!confirm(`Install v${data.latestVersion} now? The bridge will restart.`)) return;
@@ -43,9 +42,6 @@ async function initSoftwareUpdates() {
                         applyBtn.disabled = false;
                     }
                 };
-            } else if (hintEl) {
-                hintEl.hidden = false;
-                statusEl.textContent += ' Enable one-click update below, or follow the manual steps in the release notes.';
             }
             return;
         }

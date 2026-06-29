@@ -8,6 +8,20 @@ All notable changes to **Matter Cameras Bridge** are documented here ([Keep a Ch
 
 ---
 
+## [0.4.2-beta] — 2026-06-29
+
+### Changed
+
+- One-click **Update now** is enabled by default in Docker installs (no separate compose overlay or “How to update” link).
+- `setup.sh` requires a git clone so self-update works out of the box.
+
+### Fixed
+
+- Web UI self-update failed silently when the app image lacked `bash`; update output is logged to `data/self-update.log`.
+- GitHub update check falls back to version tags when no formal GitHub Release is published.
+
+---
+
 ## [0.4.1-beta] — 2026-06-29
 
 ### Fixed
@@ -125,7 +139,8 @@ First public beta under the **Matter Cameras Bridge** name.
 
 ---
 
-[Unreleased]: https://github.com/patricktd/MatterCameras/compare/v0.4.1-beta...HEAD
+[Unreleased]: https://github.com/patricktd/MatterCameras/compare/v0.4.2-beta...HEAD
+[0.4.2-beta]: https://github.com/patricktd/MatterCameras/releases/tag/v0.4.2-beta
 [0.4.1-beta]: https://github.com/patricktd/MatterCameras/releases/tag/v0.4.1-beta
 [0.4.0-beta]: https://github.com/patricktd/MatterCameras/releases/tag/v0.4.0-beta
 [0.3.0-beta]: https://github.com/patricktd/MatterCameras/compare/v0.2.0...v0.3.0-beta
