@@ -93,7 +93,7 @@ Env tuning: `MOTION_ONVIF_HOLD_MS` (default 30000).
 ## UniFi Protect (phase 3b)
 
 - Requires `protectHost` (controller IP) and `protectCameraId` (24-char id from Protect)
-- Uses [`unifi-protect`](https://github.com/hjdhjd/unifi-protect) npm — **requires `npm run deploy`** (Docker image rebuild)
+- Uses [`unifi-protect`](https://github.com/hjdhjd/unifi-protect) npm — **requires a Docker image rebuild** after `package.json` changes (`docker compose build app`)
 - One WebSocket per Protect controller; routes `motion` events / `isMotionDetected` updates for `any`, and smart person detection events for `person`
 - Env: `MOTION_UNIFI_HOLD_MS` (default 25000)
 - **Node.js ≥ 22** recommended (`unifi-protect` engine requirement)
@@ -166,4 +166,3 @@ npm test
 
 - [MATTER-CAMERA.md](./MATTER-CAMERA.md) — Matter motion clusters
 - [SCALING.md](./SCALING.md) — multi-node limits
-- [DEPLOY.md](./DEPLOY.md) — deploy and runtime data safety

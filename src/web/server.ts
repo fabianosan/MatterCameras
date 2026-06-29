@@ -147,7 +147,7 @@ app.delete('/api/settings/protect-controller', async (_req, res) => {
     res.json({ ok: true });
 });
 
-/** Deploy verification — compare with local package.json after quick-deploy. */
+/** Running version — compare after rebuilding dist/ and restarting the app container. */
 app.get('/api/version', (_req, res) => {
     res.json({ version: appVersion });
 });

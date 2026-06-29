@@ -2,9 +2,11 @@
 
 > **Beta (pre-1.0)** — version is set in `package.json` and bumped only on release (`npm run release`). Verify with `curl http://<host>:3202/api/version`.
 
-**Matter-compatible bridge** that exposes RTSP/ONVIF cameras as **Matter 1.5 Camera** endpoints on any Matter 1.5–capable hub or controller (SmartThings, Google Home, Apple Home, and others as they add camera support). This is **not** a Matter-certified product.
+**Matter-compatible bridge** that exposes RTSP/ONVIF cameras as **Matter 1.5 Camera** endpoints on any Matter 1.5–capable hub or controller. This is **not** a Matter-certified product.
 
 > **Trademark notice:** Matter is a trademark of the [Connectivity Standards Alliance](https://csa-iot.org/). Matter Cameras Bridge is an independent open-source project — **not affiliated with the CSA** and **not** a Matter-certified device. It works with Matter; it is not a Matter product.
+
+**Primary test platform:** [SmartThings](https://www.smartthings.com/) standalone hub with **Matter 1.5 camera** firmware. Other Matter hubs may work at the protocol level as they add camera support — see [docs/MATTER-CAMERA.md](docs/MATTER-CAMERA.md) for the feature matrix and known hub differences.
 
 ## Architecture
 
@@ -16,9 +18,15 @@ RTSP/ONVIF → go2rtc (WebRTC) → Matter-compatible bridge (matter.js 0.17) →
 - **go2rtc** — RTSP ingest and WebRTC SDP exchange
 - **Web UI** — add/remove cameras, Matter pairing QR, motion sensitivity
 
-## Quick start (test install)
+## Quick start
 
-**Requirements:** Docker + Compose v2, **Node.js 22+** (setup compiles `dist/` for Docker), a Matter 1.5–capable hub, and at least one RTSP camera on the same LAN.
+**Host OS:** **Linux or macOS** on the same LAN as your Matter hub and cameras. (Windows is not supported as the bridge host — see [docs/INSTALL.md](docs/INSTALL.md).)
+
+**Requirements:** Docker + Compose v2, **Node.js 22+** (the setup script compiles `dist/` on the host before Docker starts), a Matter hub with **Matter 1.5 camera** support, and at least one RTSP or ONVIF camera.
+
+> **First run needs internet** on the host to pull base images and build the Docker stack (`docker compose up --build`). After that, the bridge runs on your LAN; updates may need registry access again if you rebuild images.
+
+> **Security:** the Web UI has **no login**. Run it only on a **trusted home LAN**. Do not expose port 3202 to the internet without a separate access layer.
 
 ```bash
 git clone https://github.com/patricktd/MatterCameras.git
@@ -30,7 +38,7 @@ The script detects your LAN IP, creates `data/config.json` / `data/go2rtc.yaml` 
 
 Then open `http://<your-lan-ip>:3202`, pair the Matter QR in your hub app, and add a camera.
 
-**Full walkthrough:** [docs/INSTALL.md](docs/INSTALL.md) (pairing, ports, troubleshooting, dev mode).
+**Full walkthrough:** [docs/INSTALL.md](docs/INSTALL.md) (pairing, camera providers, ports, troubleshooting, updates).
 
 If LAN IP detection fails:
 
@@ -42,12 +50,11 @@ bash scripts/setup.sh --host 192.168.1.50
 
 | Doc | Audience |
 |-----|----------|
-| **[docs/INSTALL.md](docs/INSTALL.md)** | Testers — first install, pairing, cameras |
-| **[docs/SCALING.md](docs/SCALING.md)** | Operators — hardware limits and camera count |
-| **[docs/MATTER-CAMERA.md](docs/MATTER-CAMERA.md)** | Integrators — Matter features vs hub capabilities |
+| **[docs/INSTALL.md](docs/INSTALL.md)** | **Start here** — install, pairing, cameras, updates |
+| **[docs/MATTER-CAMERA.md](docs/MATTER-CAMERA.md)** | Feature matrix vs hub capabilities |
+| **[docs/SCALING.md](docs/SCALING.md)** | Hardware limits and camera count |
 | **[docs/WEBRTC-DEBUG.md](docs/WEBRTC-DEBUG.md)** | Debugging live view / ICE / TURN |
-| **[docs/DEPLOY.md](docs/DEPLOY.md)** | Maintainers — rsync deploy to production host |
-| **[CHANGELOG.md](CHANGELOG.md)** | Version history and system overview |
+| **[CHANGELOG.md](CHANGELOG.md)** | Version history |
 
 ## Development
 
@@ -55,25 +62,6 @@ bash scripts/setup.sh --host 192.168.1.50
 npm install
 npm start          # TypeScript via tsx (set matterHost in data/config.json)
 npm run build      # compile to dist/
-```
-
-Root workflow helpers:
-
-```bash
-./sync.sh
-./commit.sh "message" [--push]
-./quick-deploy.sh
-./deploy.sh
-```
-
-Windows PowerShell:
-
-```powershell
-./sync.ps1
-./commit.ps1 "message"
-./commit.ps1 "message" -Push
-./quick-deploy.ps1
-./deploy.ps1
 ```
 
 Local Docker stack: `./scripts/setup.sh` then `docker compose logs -f app`.  

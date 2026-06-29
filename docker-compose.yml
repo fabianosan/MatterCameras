@@ -38,9 +38,9 @@ services:
     network_mode: host
     volumes:
       - ./data:/app/data
-      # quick-deploy.sh syncs package.json so /api/version and UI badge match the deployed build.
+      # Host package.json + dist/ bind-mount so restarts pick up built JS without image rebuild.
       - ./package.json:/app/package.json:ro
-      # quick-deploy.sh syncs dist/ on the host; bind-mount so restarts pick up JS without image rebuild.
+      # npm run build on the host updates dist/; container reads it on restart.
       - ./dist:/app/dist:ro
       - ./views:/app/views:ro
       - ./public:/app/public:ro

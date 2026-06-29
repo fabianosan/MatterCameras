@@ -215,7 +215,7 @@ Retest Android; success = `Handshake Completed` in go2rtc within ~2 s of ICE `co
 ### Monitor during Android retest
 
 ```bash
-./scripts/watch-webrtc-logs.sh 2m
+docker compose logs -f app go2rtc
 ```
 
 Success criteria: `Handshake Completed` in go2rtc within ~2 s of `ICE connection state changed: connected`.
@@ -303,17 +303,19 @@ webrtc:
     ips: [192.168.1.50]
 ```
 
-## Deploy procedure
+## Updating a running bridge
 
-**Never overwrite** `data/cameras.json`, `data/config.json`, `data/go2rtc.yaml`, or `data/matter-storage/`.
-Configure `deploy.env` first (see `docs/DEPLOY.md`).
+**Never overwrite** `data/cameras.json`, `data/config.json`, `data/go2rtc.yaml`, or `data/matter-storage/` on a production host.
+
+On the bridge machine (or after syncing built `dist/` safely):
 
 ```bash
-./scripts/deploy.sh          # full
-npm run build && ./scripts/quick-deploy.sh   # JS only (rebuild image if TS changed!)
+npm run build
+docker compose up -d
+# TypeScript-only changes with dist/ bind-mount: docker compose restart app
 ```
 
-After TypeScript changes: `docker compose build --no-cache app && docker compose up -d app`.
+After TypeScript or dependency changes: `docker compose build --no-cache app && docker compose up -d app`.
 
 ## Related files
 
@@ -324,4 +326,3 @@ After TypeScript changes: `docker compose build --no-cache app && docker compose
 | `src/matter/webrtcIce.ts` | `prepareHubOfferForGo2rtc`, candidate filters |
 | `src/matter/behaviors/MatterWebRtcTransportProviderServer.ts` | Signaling, session queue |
 | `src/streaming/Go2RTCClient.ts` | ffmpeg WebRTC src, lock, recycle |
-| `scripts/watch-webrtc-logs.sh` | Live log tail for tests |

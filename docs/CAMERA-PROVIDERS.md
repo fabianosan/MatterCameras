@@ -50,7 +50,7 @@ Motion detection still uses `src/motion/` providers after the camera is saved.
 
 ## Saved UniFi Protect controller
 
-Operator-managed file: `data/settings.json` (excluded from deploy rsync).
+Operator-managed file: `data/settings.json` (local to each bridge host — do not overwrite from another machine).
 
 - **Options** → save host, local user, password once
 - Or **Remember controller login** when listing cameras in the add wizard

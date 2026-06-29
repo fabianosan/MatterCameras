@@ -1,6 +1,6 @@
-# Installation guide (testers)
+# Installation guide
 
-Step-by-step setup for trying **Matter Cameras Bridge** on your own LAN with a Matter 1.5 camera–capable hub.
+Step-by-step setup for **Matter Cameras Bridge** on your own LAN with a Matter 1.5 camera–capable hub.
 
 > **Trademark notice:** Matter is a trademark of the Connectivity Standards Alliance. This project is an independent Matter-compatible bridge — not affiliated with the CSA and not a Matter-certified product.
 
@@ -8,14 +8,17 @@ Step-by-step setup for trying **Matter Cameras Bridge** on your own LAN with a M
 
 | Requirement | Notes |
 |-------------|--------|
-| **Linux or macOS host** | Same subnet as your Matter hub and cameras |
+| **Linux or macOS host** | Same subnet as your Matter hub and cameras. **Windows is not supported** as the bridge host (Docker + Matter mDNS on Windows is out of scope for this guide). |
 | **Docker** + Compose v2 | Recommended path (`bash scripts/setup.sh`) |
-| **Node.js 22+** | Required for Docker install too — setup compiles `dist/` before `docker compose` |
-| **Matter hub** | Firmware that supports **Matter 1.5 cameras** (e.g. Aeotec / SmartThings standalone hub) |
-| **RTSP camera** | H.264 native is best; H.265 works via ffmpeg transcode (more CPU) |
+| **Node.js 22+** | Required even for Docker install — `setup.sh` runs `npm ci && npm run build` on the host (`dist/` is bind-mounted into the container) |
+| **Internet (first install)** | `docker compose up --build` pulls/builds images from Docker Hub. Offline or blocked registry → build fails; see [Troubleshooting](#troubleshooting) |
+| **Matter hub** | Firmware that supports **Matter 1.5 cameras**. **SmartThings** is the primary reference platform; Google Home / Apple Home camera support is still rolling out in many regions — verify your hub before relying on live view. |
+| **RTSP or ONVIF camera** | H.264 native is best; H.265 works via ffmpeg transcode (more CPU) |
 | **Open ports on the host** | See [Ports](#ports) below |
 
-Optional: **Node.js 22+** if you prefer running the app on the host (`--dev`) while go2rtc runs in Docker.
+### Security
+
+The Web UI on port **3202** has **no username or password**. Anyone on your LAN can add cameras, change settings, or trigger a Matter factory reset. Use only on a **trusted home network**. Do not port-forward 3202 to the internet.
 
 ## Quick install (Docker)
 
@@ -36,7 +39,7 @@ Open the Web UI at `http://<your-lan-ip>:3202`.
 
 ### Software updates
 
-The dashboard checks [GitHub Releases](https://github.com/patricktd/MatterCameras/releases) and shows a banner when a newer version is published.
+The dashboard checks [GitHub Releases](https://github.com/patricktd/MatterCameras/releases) and shows a banner when a newer version is published (requires a published release tag on GitHub).
 
 **Manual update** (any install):
 
@@ -46,6 +49,13 @@ git fetch --tags origin
 git checkout v0.4.0-beta   # or: git pull --ff-only origin main
 npm ci && npm run build
 docker compose up --build -d
+```
+
+If image rebuild fails (no route to Docker Hub) but you only changed JS/views, try starting without rebuild:
+
+```bash
+npm ci && npm run build
+docker compose up -d
 ```
 
 Or run `bash scripts/self-update.sh [version]` from the project root.
@@ -77,30 +87,54 @@ Ensure nothing else on the host binds these ports before starting.
 2. Open the Web UI on a device on the same LAN.
 3. In the **Matter pairing** section, scan the QR code (or enter the manual pairing code).
 4. In your hub app, add a Matter device and scan the QR (e.g. SmartThings: **Add device → Matter → scan QR**).
-5. Wait until the bridge appears as a Matter device.
+5. Wait until the bridge appears as **Matter Cameras Bridge** (or the name your hub shows for the paired aggregator).
 
 > **Important:** `matterHost` in `data/config.json` must be the bridge machine’s **LAN IP**, not `127.0.0.1`. The setup script sets this automatically. If you move the bridge to another machine, re-run `./scripts/setup.sh --host <new-ip>` on fresh data or edit `data/config.json` and `data/go2rtc.yaml` (WebRTC `candidates` / `filters.ips`).
 
 ## Add a camera
 
-### Option A — ONVIF scan (recommended when cameras support ONVIF)
+Web UI → **Add Camera** — pick a provider:
 
-1. Web UI → **+ Add Camera**
-2. Enter **ONVIF username** and **password** (shared across discovered devices)
+| Provider | Best for |
+|----------|----------|
+| **UniFi Protect** | Cameras on a UniFi Protect controller; bulk import; native Protect motion |
+| **Reolink** | Reolink cameras/NVR — login fills RTSP URL; optional spotlight / person sensor |
+| **ONVIF** | Generic ONVIF cameras — **Scan LAN (5s)** on UDP 3702, then **Use** on a device |
+| **Tapo / Sonoff** | Tapo or Sonoff cameras using the app camera-account credentials |
+| **Manual RTSP** | Any camera — paste `rtsp://user:pass@host:554/...` |
+
+### UniFi Protect
+
+1. **Add Camera** → **UniFi Protect**
+2. Enter controller host, user, and password (or save once under **Options → UniFi Protect controller**)
+3. List cameras, select those with RTSP enabled in Protect, import
+
+Cameras without an RTSP alias in Protect must have RTSP enabled under camera **Advanced** settings first.
+
+### Reolink
+
+1. **Add Camera** → **Reolink**
+2. Enter camera/NVR IP, username, password
+3. Pick channel/stream; optional person-presence sensor and spotlight endpoints in Advanced
+
+### ONVIF scan
+
+1. **Add Camera** → **ONVIF**
+2. Enter shared **ONVIF username** and **password**
 3. Click **Scan LAN (5s)** — WS-Discovery on UDP 3702 (same subnet as the bridge host)
 4. Click **Use** on a discovered camera — the form fills with name, RTSP URL, and ONVIF URL
 5. Review and click **Add Camera**
 
 If ONVIF is on a non-standard port, set **ONVIF device URL** under Advanced after scan.
 
-### Option B — manual RTSP URL
+### Manual RTSP URL
 
-1. Web UI → **Add camera**
+1. **Add Camera** → **Manual RTSP**
 2. Name + RTSP URL, e.g. `rtsp://user:pass@192.168.1.100:554/stream1`
 3. Save — the bridge registers the stream in go2rtc and exposes a new bridged Matter camera endpoint.
 4. In your hub app, open the bridge device and confirm the new camera appears (may take a short hub sync).
 
-**Motion (Advanced):** default **Frame diff** works on any RTSP. Choose **ONVIF events** if the camera supports ONVIF motion (lower CPU).
+**Motion (Advanced):** default **Frame diff** works on any RTSP. Choose **ONVIF events** if the camera supports ONVIF motion (lower CPU). UniFi and Reolink cameras can use vendor-native motion when configured.
 
 ### More than 4 cameras (hub app limits)
 
@@ -128,8 +162,8 @@ docker compose logs -f app
 # go2rtc API
 curl -s http://127.0.0.1:3203/api | head
 
-# Matter / Web UI ports
-curl -s -o /dev/null -w "%{http_code}\n" http://127.0.0.1:3202/
+# Version
+curl -s http://127.0.0.1:3202/api/version
 ```
 
 ## Development mode (no Docker for the app)
@@ -158,6 +192,8 @@ Environment variables (override file config): `MATTER_HOST`, `MATTER_PORT`, `WEB
 
 | Symptom | Things to check |
 |---------|-----------------|
+| `setup.sh` fails on Docker build | Internet and access to `registry-1.docker.io`; retry later. If images already exist: `docker compose up -d` (no `--build`) after `npm run build` |
+| Connection refused on :3202 | `docker compose ps` — containers may be down after a failed `up --build`; run `docker compose up -d` |
 | Hub cannot find bridge | Same VLAN/subnet; UDP 5353 not blocked; `matterHost` is LAN IP |
 | Live view black / timeout | WebRTC port **8555** open host↔hub; see [WEBRTC-DEBUG.md](WEBRTC-DEBUG.md) |
 | Snapshot works, no video | Usually ICE/TURN — confirm `go2rtc.yaml` `candidates` IP |
@@ -176,6 +212,5 @@ docker compose down
 
 ## Next steps
 
-- [SCALING.md](SCALING.md) — hardware and camera count limits
 - [MATTER-CAMERA.md](MATTER-CAMERA.md) — feature matrix vs hub capabilities
-- [DEPLOY.md](DEPLOY.md) — maintainer production deploy (rsync / remote host)
+- [SCALING.md](SCALING.md) — hardware and camera count limits

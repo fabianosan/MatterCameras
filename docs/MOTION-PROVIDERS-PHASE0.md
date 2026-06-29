@@ -268,7 +268,7 @@ Requirements for multi-node (not implemented today):
 |---------|----------|
 | Separate Matter fabrics | One `matter-storage/` per node; separate pairing QR per node |
 | Camera roster | `data/cameras.json` per node; Web UI shows node id |
-| Deploy | Same `deploy.sh` / `deploy.env` with different `DEPLOY_HOST` |
+| Deploy | Per-host Docker install; never overwrite `data/` on production hosts |
 | Discovery | ONVIF scan per subnet; document which node owns which VLAN |
 | CPU | Prefer native motion events (ONVIF, Reolink, UniFi) over frame-diff |
 

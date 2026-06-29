@@ -34,7 +34,7 @@ RTSP/ONVIF → go2rtc (WebRTC + snapshots) → Matter Bridge (matter.js 0.17) �
 | **Web UI** | `src/web/server.ts` + `views/` | Express/EJS dashboard for management and pairing |
 | **Motion providers** | `src/motion/` | Pluggable per-camera motion backends (ONVIF, frame-diff; vendor plugins planned) |
 | **go2rtc** | `alexxit/go2rtc` container | RTSP ingest, WebRTC relay, HTTP/WS API |
-| **Deploy** | `docker-compose.yml`, `scripts/deploy.sh` | Production with `network_mode: host` (mDNS/Matter) |
+| **Deploy** | `docker-compose.yml`, `scripts/setup.sh` | Production with `network_mode: host` (mDNS/Matter) |
 
 ### Default ports (production)
 
@@ -66,7 +66,9 @@ See [docs/SCALING.md](docs/SCALING.md) for hardware recommendations, camera coun
 - **One-click self-update (optional)** — with `docker-compose.update.yml`, the dashboard can run `scripts/self-update.sh` (git checkout release tag, `npm ci`, rebuild containers). Camera roster and Matter pairing under `data/` are preserved.
 
 ### Changed
+- **Maintainer ops removed from public repo** — deploy, quick-deploy, sync, commit helpers, `docs/DEPLOY.md`, and `deploy.env.example` are no longer tracked (keep copies on NAS / local machines; paths listed in `.gitignore`).
 - **Project display name** — rebranded to **Matter Cameras Bridge** (Matter-compatible bridge, not a Matter-certified product). Web UI shows a CSA trademark disclaimer; hub product name updated. GitHub repository path `MatterCameras` unchanged.
+- **Install documentation** — README and `docs/INSTALL.md` now state Linux/macOS host requirement, SmartThings as primary test platform, Web UI security (no auth), first-run Docker Hub dependency, camera provider matrix, and recovery when `docker compose up --build` fails.
 - **Documentation** — README, install guide, Matter feature docs, scaling, and Web UI copy now describe Matter hubs generically; SmartThings remains documented as the reference platform where behavior is hub-specific.
 - **Release versioning** — `npm run deploy` and `npm run quick-deploy` no longer auto-bump `package.json`. Use `npm run release` (patch), `release:minor`, or `release:major` when publishing to the community; update `CHANGELOG.md` and tag the release before deploy.
 - **Mechanical PTZ exposure** — the Matter PTZ cluster is advertised only after a successful capability probe (`ptzCapable: true`). UniFi Protect cameras are excluded. Endpoints that no longer qualify are recreated without PTZ on bridge startup (hub may still need **Recycle Matter binding** on fixed cameras to refresh SmartThings).
