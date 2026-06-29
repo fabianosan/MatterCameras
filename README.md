@@ -1,6 +1,10 @@
 # Matter Cameras Bridge
 
+![GitHub release](https://img.shields.io/github/v/release/patricktd/MatterCameras?include_prereleases&label=version)
+
 > **Beta (pre-1.0)** — version is set in `package.json` and bumped only on release (`npm run release`). Verify with `curl http://<host>:3202/api/version`.
+
+![Matter Cameras Bridge dashboard — pairing, camera list, and live previews](docs/images/dashboard.png)
 
 **Matter-compatible bridge** that exposes RTSP/ONVIF cameras as **Matter 1.5 Camera** endpoints on any Matter 1.5–capable hub or controller. This is **not** a Matter-certified product.
 
