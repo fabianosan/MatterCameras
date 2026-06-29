@@ -40,6 +40,27 @@ function pickLatestRelease(releases: GitHubRelease[]): GitHubRelease | null {
     });
 }
 
+interface GitHubTag {
+    name: string;
+}
+
+function pickLatestTag(tags: GitHubTag[]): string | null {
+    const named = tags.map((tag) => tag.name).filter(Boolean);
+    if (named.length === 0) {
+        return null;
+    }
+
+    return named.reduce((latest, candidate) => {
+        try {
+            return compareVersions(normalizeTag(candidate), normalizeTag(latest)) > 0
+                ? candidate
+                : latest;
+        } catch {
+            return latest;
+        }
+    });
+}
+
 async function fetchLatestRelease(): Promise<CachedRelease> {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 12_000);
@@ -67,7 +88,35 @@ async function fetchLatestRelease(): Promise<CachedRelease> {
         }
 
         const releases = await response.json() as GitHubRelease[];
-        const release = pickLatestRelease(releases);
+        let release = pickLatestRelease(releases);
+
+        if (!release) {
+            const tagsResponse = await fetch(
+                `https://api.github.com/repos/${GITHUB_REPO}/tags?per_page=30`,
+                {
+                    headers: {
+                        Accept: 'application/vnd.github+json',
+                        'User-Agent': 'Matter-Cameras-Bridge',
+                    },
+                    signal: controller.signal,
+                },
+            );
+
+            if (tagsResponse.ok) {
+                const tags = await tagsResponse.json() as GitHubTag[];
+                const latestTag = pickLatestTag(tags);
+                if (latestTag) {
+                    release = {
+                        tag_name: latestTag,
+                        html_url: `https://github.com/${GITHUB_REPO}/releases/tag/${latestTag}`,
+                        body: '',
+                        published_at: '',
+                        draft: false,
+                    };
+                }
+            }
+        }
+
         if (!release) {
             return {
                 fetchedAt: Date.now(),
