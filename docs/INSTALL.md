@@ -9,8 +9,8 @@ Step-by-step setup for **Matter Cameras Bridge** on your own LAN with a Matter 1
 | Requirement | Notes |
 |-------------|--------|
 | **Linux or macOS host** | Same subnet as your Matter hub and cameras. **Windows is not supported** as the bridge host (Docker + Matter mDNS on Windows is out of scope for this guide). |
-| **Docker** + Compose v2 | Recommended path (`bash scripts/setup.sh`) |
-| **Node.js 22+** | Required even for Docker install — `setup.sh` runs `npm ci && npm run build` on the host (`dist/` is bind-mounted into the container) |
+| **Docker** + Compose v2 | **Required for both paths** — Option A builds locally (`bash scripts/setup.sh`), Option B runs pre-built images (`docker compose -f docker-compose.ghcr.yml`) |
+| **Node.js 22+** | Only for **Option A (build from source)** — `setup.sh` runs `npm ci && npm run build` on the host. **Not needed** for the pre-built image install (Option B). |
 | **Internet (first install)** | `docker compose up --build` pulls/builds images from Docker Hub. Offline or blocked registry → build fails; see [Troubleshooting](#troubleshooting) |
 | **Matter hub** | Firmware that supports **Matter 1.5 cameras**. **SmartThings** is the primary reference platform; Google Home / Apple Home camera support is still rolling out in many regions — verify your hub before relying on live view. |
 | **RTSP or ONVIF camera** | H.264 native is best; H.265 works via ffmpeg transcode (more CPU) |
@@ -22,24 +22,47 @@ The Web UI on port **3202** has **no username or password**. Anyone on your LAN 
 
 ## Quick install (Docker)
 
+Pick one path. Both run the same two-container stack (`go2rtc` + `app`) with `network_mode: host`.
+
+### Option A — Build from source (default)
+
+Clone and let the setup script build and run everything. Enables the in-app **Update now** button. Requires **Node.js 22+**.
+
 ```bash
 git clone https://github.com/patricktd/MatterCameras.git
 cd MatterCameras
 bash scripts/setup.sh
 ```
 
-The script:
+`setup.sh`:
 
 1. Detects your LAN IP (or use `bash scripts/setup.sh --host 192.168.1.50`)
 2. Creates `data/config.json`, `data/go2rtc.yaml`, `data/cameras.json`, and `.env` from templates (only if missing)
 3. Runs `npm ci && npm run build` (populates `dist/` for the Docker bind-mount)
 4. Builds and starts **go2rtc** + **app** with `network_mode: host`
 
+### Option B — Pre-built image (single compose file — Portainer / CasaOS / docker)
+
+Run published images from GHCR — **no clone, no Node.js, no build, no seeded files**. The app keeps its data in a Docker named volume, and the go2rtc config ships inside the image (`LAN_IP` fills the WebRTC candidates at startup).
+
+1. Download **[docker-compose.ghcr.yml](../docker-compose.ghcr.yml)**.
+2. Set **`LAN_IP`** to this machine's LAN IPv4 (e.g. `192.168.1.50`) — the only required value.
+3. Deploy:
+   - **plain docker:** `LAN_IP=192.168.1.50 docker compose -f docker-compose.ghcr.yml up -d`
+   - **Portainer / CasaOS:** paste the file as a stack and set `LAN_IP` in the stack's environment variables.
+
+`LAN_IP` is a **required** variable — the deploy fails fast with a message if it is unset (guards against the "starts but no pairing/video" trap of leaving it at `127.0.0.1`). To run a fork's images, set `IMAGE_OWNER` (and `GITHUB_REPO`); pin a release with `IMAGE_TAG`. See [.env.ghcr.example](../.env.ghcr.example). Requires **Linux with host networking** (Matter mDNS); Docker Desktop on Windows/macOS does not provide host networking the same way.
+
 Open the Web UI at `http://<your-lan-ip>:3202`.
 
 ### Software updates
 
-Install from a **git clone** (`git clone https://github.com/patricktd/MatterCameras.git`) so the bridge can update itself.
+How you update depends on the install path:
+
+- **Option A (build from source):** one-click **Update now** in the Web UI, described below.
+- **Option B (pre-built image):** `docker compose -f docker-compose.ghcr.yml pull && docker compose -f docker-compose.ghcr.yml up -d` (pin `IMAGE_TAG` to control the release). The in-app **Update now** button is hidden in this mode — there is no host git checkout to rebuild.
+
+For Option A, install from a **git clone** (`git clone https://github.com/patricktd/MatterCameras.git`) so the bridge can update itself.
 
 The dashboard checks [GitHub](https://github.com/patricktd/MatterCameras/releases) for newer version tags. When one is available, click **Update now** on the banner or under **Options → Software updates**. The bridge checks out the tag, rebuilds, and restarts Docker — `data/cameras.json`, `data/matter-storage/`, and pairing are preserved.
 
@@ -171,7 +194,9 @@ npm start
 | `data/matter-storage/` | Matter fabric — **do not delete** after pairing |
 | `.env` | Optional overrides for Docker Compose |
 
-Environment variables (override file config): `MATTER_HOST`, `MATTER_PORT`, `WEB_PORT`, `GO2RTC_URL`, `MATTER_PASSCODE`, `MATTER_DISCRIMINATOR`.
+Environment variables (override file config): `MATTER_HOST`, `MATTER_BIND_HOST`, `MATTER_PORT`, `WEB_PORT`, `GO2RTC_URL`, `TZ`, `GITHUB_REPO` (repo polled for update notifications), `MATTER_PASSCODE`, `MATTER_DISCRIMINATOR`.
+
+For the **pre-built image** install, `REGISTRY`, `IMAGE_OWNER`, and `IMAGE_TAG` (in `.env`) select which images to pull — see [.env.ghcr.example](../.env.ghcr.example).
 
 ## Troubleshooting
 
