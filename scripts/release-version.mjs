@@ -289,9 +289,12 @@ console.log(`    Updated package.json, package-lock.json, CHANGELOG.md, ${notesF
 
 run('git', ['add', 'package.json', 'package-lock.json', 'CHANGELOG.md', notesFile]);
 run('git', ['commit', '-m', `release: ${tag}`]);
-run('git', ['tag', tag]);
+run('git', ['tag', '-a', tag, '-m', `Release ${tag}`]);
 if (!opts.noPush) {
-    run('git', ['push', 'origin', 'main', '--follow-tags']);
+    run('git', ['push', 'origin', 'main']);
+    // Push the tag explicitly: `--follow-tags` skips lightweight tags, and both the
+    // CI tag trigger and `gh release create` need the tag present on the remote.
+    run('git', ['push', 'origin', tag]);
 }
 
 if (opts.localImages) {
@@ -311,7 +314,7 @@ if (opts.localImages) {
     console.log(`==> Done: ${tag} published to ${opts.registry}/${opts.owner} and released on ${opts.repo}.`);
 } else if (opts.noPush) {
     console.log(`==> Tagged ${tag} locally (--no-push). Push it to trigger CI:`);
-    console.log('    git push origin main --follow-tags');
+    console.log(`    git push origin main && git push origin ${tag}`);
 } else {
     console.log(`==> Pushed ${tag}. GitHub Actions (.github/workflows/release.yml) will build the`);
     console.log('    multi-arch images and create the Release. Remember: GHCR packages start');
