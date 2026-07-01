@@ -8,6 +8,10 @@ All notable changes to **Matter Cameras Bridge** are documented here ([Keep a Ch
 
 ---
 
+## [0.4.4-beta] — 2026-07-01
+
+---
+
 ## [0.4.3-beta] — 2026-07-01
 
 ---
