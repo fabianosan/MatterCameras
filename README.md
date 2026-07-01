@@ -48,17 +48,17 @@ The script detects your LAN IP, creates `data/config.json` / `data/go2rtc.yaml` 
 
 ### Option B — Pre-built image (single compose file — Portainer / CasaOS / docker)
 
-Run published images from the GitHub Container Registry — **no clone, no Node.js, no build**. One file, one variable:
+Run published images from the GitHub Container Registry. **No clone, no Node.js, no build.** One file, one variable:
 
 1. Download **[docker-compose.ghcr.yml](docker-compose.ghcr.yml)**.
-2. Set **`LAN_IP`** to this machine's LAN IPv4 (e.g. `192.168.1.50`) — the only required value.
-3. Deploy:
-   - **plain docker:** `LAN_IP=192.168.1.50 docker compose -f docker-compose.ghcr.yml up -d`
-   - **Portainer / CasaOS:** paste the file as a stack and set `LAN_IP` in the stack's environment variables.
+2. Set **`LAN_IP`** to this machine's LAN IPv4 (e.g. `192.168.1.50`), the only required value:
+   - **plain docker (inline):** `LAN_IP=192.168.1.50 docker compose -f docker-compose.ghcr.yml up -d`
+   - **plain docker (.env):** `cp .env.ghcr.example .env`, set `LAN_IP` in it, then `docker compose -f docker-compose.ghcr.yml up -d` (or add `--env-file .env.ghcr.example` to use the template directly).
+   - **CasaOS / Portainer:** import the file, then set `LAN_IP` in the app's Environment variables. These UIs do **not** read a `.env` file.
 
-The app keeps its data in a Docker **named volume** and the go2rtc config ships **inside the image** — nothing is seeded on the host. **Update later:** `docker compose -f docker-compose.ghcr.yml pull && docker compose -f docker-compose.ghcr.yml up -d`.
+The app keeps its data in a Docker **named volume** and the go2rtc config ships **inside the image**, so nothing is seeded on the host. The file includes an `x-casaos` block (title, icon, Web UI port). **Update later:** `docker compose -f docker-compose.ghcr.yml pull && up -d`.
 
-> Requires **Linux with host networking** (Matter mDNS). To run a fork's images, set `IMAGE_OWNER` (and `GITHUB_REPO`); pin a release with `IMAGE_TAG`. See [.env.ghcr.example](.env.ghcr.example).
+> Requires **Linux with host networking** (Matter mDNS). To run your own fork's images, edit the two `image:` lines (change `patricktd` to your GitHub user). See [.env.ghcr.example](.env.ghcr.example).
 
 ---
 

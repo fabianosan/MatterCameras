@@ -43,15 +43,15 @@ bash scripts/setup.sh
 
 ### Option B — Pre-built image (single compose file — Portainer / CasaOS / docker)
 
-Run published images from GHCR — **no clone, no Node.js, no build, no seeded files**. The app keeps its data in a Docker named volume, and the go2rtc config ships inside the image (`LAN_IP` fills the WebRTC candidates at startup).
+Run published images from GHCR. **No clone, no Node.js, no build, no seeded files.** The app keeps its data in a Docker named volume, and the go2rtc config ships inside the image (`LAN_IP` fills the WebRTC candidates at startup). The file also carries an `x-casaos` block (title, icon, Web UI port).
 
 1. Download **[docker-compose.ghcr.yml](../docker-compose.ghcr.yml)**.
-2. Set **`LAN_IP`** to this machine's LAN IPv4 (e.g. `192.168.1.50`) — the only required value.
-3. Deploy:
-   - **plain docker:** `LAN_IP=192.168.1.50 docker compose -f docker-compose.ghcr.yml up -d`
-   - **Portainer / CasaOS:** paste the file as a stack and set `LAN_IP` in the stack's environment variables.
+2. Set **`LAN_IP`** to this machine's LAN IPv4 (e.g. `192.168.1.50`), the only required value:
+   - **plain docker (inline):** `LAN_IP=192.168.1.50 docker compose -f docker-compose.ghcr.yml up -d`
+   - **plain docker (.env):** `cp .env.ghcr.example .env`, set `LAN_IP` in it, then `docker compose -f docker-compose.ghcr.yml up -d` (or add `--env-file .env.ghcr.example` to use the template directly).
+   - **CasaOS / Portainer:** import the file, then set `LAN_IP` in the app's Environment variables. These UIs do NOT read a `.env` file and do not expand `${VAR:-default}`, so the image tags are concrete.
 
-`LAN_IP` is a **required** variable — the deploy fails fast with a message if it is unset (guards against the "starts but no pairing/video" trap of leaving it at `127.0.0.1`). To run a fork's images, set `IMAGE_OWNER` (and `GITHUB_REPO`); pin a release with `IMAGE_TAG`. See [.env.ghcr.example](../.env.ghcr.example). Requires **Linux with host networking** (Matter mDNS); Docker Desktop on Windows/macOS does not provide host networking the same way.
+Always set `LAN_IP` to the correct IP: left at the sample value it still starts, but Matter pairing and WebRTC will not work. To run your own fork's images, edit the two `image:` lines (change `patricktd` to your GitHub user). Requires **Linux with host networking** (Matter mDNS); Docker Desktop on Windows/macOS does not provide host networking the same way.
 
 Open the Web UI at `http://<your-lan-ip>:3202`.
 
@@ -60,7 +60,7 @@ Open the Web UI at `http://<your-lan-ip>:3202`.
 How you update depends on the install path:
 
 - **Option A (build from source):** one-click **Update now** in the Web UI, described below.
-- **Option B (pre-built image):** `docker compose -f docker-compose.ghcr.yml pull && docker compose -f docker-compose.ghcr.yml up -d` (pin `IMAGE_TAG` to control the release). The in-app **Update now** button is hidden in this mode — there is no host git checkout to rebuild.
+- **Option B (pre-built image):** `docker compose -f docker-compose.ghcr.yml pull && docker compose -f docker-compose.ghcr.yml up -d`. The in-app **Update now** button is hidden in this mode: there is no host git checkout to rebuild.
 
 For Option A, install from a **git clone** (`git clone https://github.com/patricktd/MatterCameras.git`) so the bridge can update itself.
 
@@ -196,7 +196,7 @@ npm start
 
 Environment variables (override file config): `MATTER_HOST`, `MATTER_BIND_HOST`, `MATTER_PORT`, `WEB_PORT`, `GO2RTC_URL`, `TZ`, `GITHUB_REPO` (repo polled for update notifications), `MATTER_PASSCODE`, `MATTER_DISCRIMINATOR`.
 
-For the **pre-built image** install, `REGISTRY`, `IMAGE_OWNER`, and `IMAGE_TAG` (in `.env`) select which images to pull — see [.env.ghcr.example](../.env.ghcr.example).
+For the **pre-built image** install, the image tags are concrete in [docker-compose.ghcr.yml](../docker-compose.ghcr.yml); edit the two `image:` lines to run a fork's images. See [.env.ghcr.example](../.env.ghcr.example).
 
 ## Troubleshooting
 
