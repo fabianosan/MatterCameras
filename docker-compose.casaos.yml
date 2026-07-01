@@ -1,19 +1,13 @@
-# Matter Cameras Bridge — pre-built images (GHCR). Single-file stack for
-# CasaOS / Portainer / plain docker. No clone, no host build, no seeded files:
-# the app stores state in a named volume and the go2rtc config ships in the image.
+# Matter Cameras Bridge: pre-built images (GHCR) for CasaOS / Portainer.
 #
-# Set LAN_IP to this machine's LAN IPv4 (e.g. 192.168.1.50, NOT 127.0.0.1) so
-# Matter pairing and WebRTC live view work:
-#   - plain docker:  LAN_IP=192.168.1.50 docker compose -f docker-compose.ghcr.yml up -d
-#   - CasaOS / Portainer: after importing, set LAN_IP in the container's Environment
-#     variables. These UIs do NOT read a separate .env file, and do not expand
-#     ${VAR:-default}, so the image tags below are concrete on purpose.
+# Import this file, then EDIT these values in the app's settings:
+#   - LAN_IP (go2rtc) and MATTER_HOST (app): this machine's LAN IPv4
+#     (e.g. 192.168.1.50), NOT 127.0.0.1, or Matter pairing and WebRTC will not work.
+#   - the two image: lines: change patricktd to your GitHub user to run a fork's images.
 #
-# To run your OWN fork's images, change the two `image:` lines from `patricktd`
-# to your GitHub user (e.g. ghcr.io/yourname/...).
-#
-# Requires Linux with host networking (Matter mDNS on UDP 5353).
-# Ports: 3202 Web UI · 3203 go2rtc · 5550 Matter · 8554 RTSP · 8555 WebRTC · 5353 mDNS
+# No .env / variables: CasaOS and Portainer do not read a .env file, so every value
+# is concrete. Requires Linux with host networking (Matter mDNS on UDP 5353).
+# Ports: 3202 Web UI, 3203 go2rtc, 5550 Matter, 8554 RTSP, 8555 WebRTC, 5353 mDNS
 
 services:
   go2rtc:
@@ -22,8 +16,7 @@ services:
     restart: unless-stopped
     network_mode: host
     environment:
-      # This machine's LAN IPv4. Fills the WebRTC candidates baked into the image.
-      - LAN_IP=${LAN_IP:-192.168.1.50}
+      - LAN_IP=192.168.1.50   # <-- change to this machine's LAN IPv4
     healthcheck:
       test: ["CMD", "wget", "-q", "-O", "-", "http://127.0.0.1:3203/api"]
       interval: 30s
@@ -37,17 +30,14 @@ services:
     restart: unless-stopped
     network_mode: host
     volumes:
-      # Docker-managed named volume: config, cameras, matter-storage. No host path.
       - mattercam_data:/app/data
     environment:
       - NODE_ENV=production
-      - TZ=${TZ:-America/Sao_Paulo}
+      - TZ=America/Sao_Paulo
       - MATTER_STORAGE_PATH=/app/data/matter-storage
-      # Same LAN IP as go2rtc above.
-      - MATTER_HOST=${LAN_IP:-192.168.1.50}
-      - WEB_PORT=${WEB_PORT:-3202}
+      - MATTER_HOST=192.168.1.50   # <-- same LAN IPv4 as go2rtc above
+      - WEB_PORT=3202
       - GO2RTC_URL=http://127.0.0.1:3203
-      - GITHUB_REPO=patricktd/MatterCameras
     depends_on:
       go2rtc:
         condition: service_healthy

@@ -46,19 +46,22 @@ bash scripts/setup.sh
 
 The script detects your LAN IP, creates `data/config.json` / `data/go2rtc.yaml` / `.env`, runs `npm ci && npm run build`, and starts **go2rtc** + **app** in Docker.
 
-### Option B — Pre-built image (single compose file — Portainer / CasaOS / docker)
+### Option B — Pre-built image (Portainer / CasaOS / docker)
 
-Run published images from the GitHub Container Registry. **No clone, no Node.js, no build.** One file, one variable:
+Run published images from the GitHub Container Registry. **No clone, no Node.js, no build.** Two files, pick the one for your setup:
 
-1. Download **[docker-compose.ghcr.yml](docker-compose.ghcr.yml)**.
-2. Set **`LAN_IP`** to this machine's LAN IPv4 (e.g. `192.168.1.50`), the only required value:
-   - **plain docker (inline):** `LAN_IP=192.168.1.50 docker compose -f docker-compose.ghcr.yml up -d`
-   - **plain docker (.env):** `cp .env.ghcr.example .env`, set `LAN_IP` in it, then `docker compose -f docker-compose.ghcr.yml up -d` (or add `--env-file .env.ghcr.example` to use the template directly).
-   - **CasaOS / Portainer:** import the file, then set `LAN_IP` in the app's Environment variables. These UIs do **not** read a `.env` file.
+**CasaOS / Portainer** — import **[docker-compose.casaos.yml](docker-compose.casaos.yml)**, then edit `LAN_IP` (go2rtc) and `MATTER_HOST` (app) to this machine's LAN IPv4 in the app's settings. Every value is concrete (these UIs do not read a `.env`), and it carries an `x-casaos` block (title, icon, Web UI port).
 
-The app keeps its data in a Docker **named volume** and the go2rtc config ships **inside the image**, so nothing is seeded on the host. The file includes an `x-casaos` block (title, icon, Web UI port). **Update later:** `docker compose -f docker-compose.ghcr.yml pull && up -d`.
+**Plain docker (CLI)** — use **[docker-compose.cli.yml](docker-compose.cli.yml)** with a `.env`:
 
-> Requires **Linux with host networking** (Matter mDNS). To run your own fork's images, edit the two `image:` lines (change `patricktd` to your GitHub user). See [.env.ghcr.example](.env.ghcr.example).
+```bash
+cp .env.cli.example .env      # set LAN_IP in .env
+docker compose -f docker-compose.cli.yml up -d
+```
+
+The app keeps its data in a Docker **named volume** and the go2rtc config ships **inside the image**, so nothing is seeded on the host. **Update later:** `docker compose -f <file> pull && up -d`.
+
+> Requires **Linux with host networking** (Matter mDNS). To run your own fork's images, set `IMAGE_OWNER` in `.env` (CLI) or edit the two `image:` lines (CasaOS).
 
 ---
 
