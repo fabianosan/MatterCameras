@@ -1,4 +1,6 @@
 name: release
+# Show the version (tag) or the chosen bump in the Actions run list.
+run-name: release ${{ github.event_name == 'workflow_dispatch' && inputs.bump || github.ref_name }}
 
 # Publishes multi-arch images to GHCR and creates the GitHub Release.
 # Fork-agnostic: it always publishes under the repo's own owner/namespace,
