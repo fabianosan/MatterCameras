@@ -1,6 +1,7 @@
 import type { Camera } from '../types/index.js';
 import { cameraLooksLikeReolink } from '../motion/providers/reolink/reolinkClient.js';
 import { canCameraExposeReolinkLight, reolinkLightEndpointId, shouldExposeReolinkLight } from './reolinkLightConfig.js';
+import { composeNodeLabel } from './nodeLabel.js';
 
 const PERSON_SENSOR_ID_PREFIX = 'person-';
 
@@ -32,7 +33,7 @@ export function baseCameraIdFromPersonSensorId(id: string): string | null {
 }
 
 export function personSensorLabel(camera: Pick<Camera, 'name'>): string {
-    return `${camera.name} Person Presence`;
+    return composeNodeLabel(camera.name, ' Person Presence');
 }
 
 export function canCameraExposePersonSensor(camera: Camera): boolean {

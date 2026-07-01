@@ -1,5 +1,6 @@
 import type { Camera } from '../types/index.js';
 import { cameraLooksLikeReolink } from '../motion/providers/reolink/reolinkClient.js';
+import { composeNodeLabel } from './nodeLabel.js';
 
 const REOLINK_LIGHT_ID_PREFIX = 'light-';
 
@@ -17,7 +18,7 @@ export function baseCameraIdFromReolinkLightId(id: string): string | null {
 }
 
 export function reolinkLightLabel(camera: Pick<Camera, 'name'>): string {
-    return `${camera.name} Light`;
+    return composeNodeLabel(camera.name, ' Light');
 }
 
 export function canCameraExposeReolinkLight(camera: Camera): boolean {

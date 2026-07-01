@@ -1,5 +1,6 @@
 import { CameraDevice } from '@matter/main/devices/camera';
 import { BridgedDeviceBasicInformationServer } from '@matter/main/behaviors/bridged-device-basic-information';
+import { clampNodeLabel } from '../nodeLabel.js';
 import { MatterCameraAvStreamManagementServer } from '../behaviors/MatterCameraAvStreamManagementServer.js';
 import { MatterCameraAvSettingsUserLevelManagementServer } from '../behaviors/MatterCameraAvSettingsUserLevelManagementServer.js';
 import { MatterWebRtcTransportProviderServer } from '../behaviors/MatterWebRtcTransportProviderServer.js';
@@ -41,7 +42,7 @@ export function bridgedCameraOptions(camera: Camera) {
     const options: Record<string, unknown> = {
         id: camera.id,
         bridgedDeviceBasicInformation: {
-            nodeLabel: camera.name,
+            nodeLabel: clampNodeLabel(camera.name),
             reachable: true,
             vendorName: camera.manufacturer?.trim() || 'RTSP',
             productName: 'RTSP Camera',

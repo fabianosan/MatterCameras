@@ -11,6 +11,7 @@ import { MotionDetectionService } from '../streaming/MotionDetectionService.js';
 import { ReolinkLightService } from '../streaming/ReolinkLightService.js';
 import { PtzService } from '../streaming/PtzService.js';
 import { streamContext } from './behaviors/streamContext.js';
+import { clampNodeLabel } from './nodeLabel.js';
 import { BridgedDeviceBasicInformationServer } from '@matter/main/behaviors/bridged-device-basic-information';
 import { BridgedCameraDevice, bridgedCameraDeviceType, bridgedCameraOptions, MatterCameraAvSettingsUserLevelManagementServer } from './devices/BridgedCameraDevice.js';
 import { BridgedPersonSensorDevice, bridgedPersonSensorOptions } from './devices/BridgedPersonSensorDevice.js';
@@ -356,7 +357,7 @@ export class MatterBridge {
 
         console.log(`Updating bridged camera: ${camera.name} (${camera.id})`);
         await endpoint.setStateOf(BridgedDeviceBasicInformationServer, {
-            nodeLabel: camera.name,
+            nodeLabel: clampNodeLabel(camera.name),
         });
 
         if (shouldExposePersonSensor(camera)) {
